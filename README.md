@@ -7,12 +7,12 @@ A production-style Python prototype for safely downloading large datasets via AP
 ```
 api_bulk_downloader/
 ├── core/
+│   ├── config.py       # Persistent output-dir config (load/save ~/.config/.../config.json)
 │   ├── downloader.py   # Streaming downloader with retry/backoff (connector-agnostic)
 │   ├── file_utils.py   # Chunk writes, ZIP extraction, CSV row counting
 │   └── logger.py       # Logging setup and DownloadMetrics dataclass
 ├── connectors/
-│   ├── worldbank.py    # World Bank Indicators API connector
-│   └──
+│   └── worldbank.py    # World Bank Indicators API connector
 └── main.py             # CLI entry point
 ```
 
