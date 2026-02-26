@@ -66,12 +66,21 @@ class BulkDownloader:
     # Public API
     # ------------------------------------------------------------------
 
-    def download(self, filename: str) -> DownloadMetrics:
+    def download(self, filename: str, *, count_rows: bool = False) -> DownloadMetrics:
         """
         Stream the connector's resource to *dest_dir/filename*.
 
         If the downloaded file is a ZIP archive it is automatically extracted
         and the archive itself is kept alongside the extracted contents.
+
+        Parameters
+        ----------
+        filename:
+            Name of the file to write inside *dest_dir*.
+        count_rows:
+            When True, count data rows in the primary CSV after download.
+            Disabled by default because it requires a full file scan and can
+            add noticeable time for large datasets (e.g. ~2 s for 400 K rows).
 
         Returns a populated :class:`DownloadMetrics` instance.
         """
@@ -89,19 +98,20 @@ class BulkDownloader:
         if file_utils.is_zip(dest_file):
             log.info("Archive detected — extracting to %s", self._dest_dir)
             extracted = file_utils.extract_zip(dest_file, self._dest_dir)
-            csvs = [p for p in extracted if p.suffix.lower() == ".csv"]
-            if csvs:
-                # Prefer data CSVs (prefixed "API_") over metadata CSVs.
-                # World Bank ZIPs contain both; without this we'd count the
-                # 1-row Metadata_Indicator file instead of the actual dataset.
-                data_csvs = [p for p in csvs if p.name.startswith("API_")]
-                primary_csv = data_csvs[0] if data_csvs else csvs[0]
-                try:
-                    metrics.row_count = file_utils.count_csv_rows(primary_csv)
-                    log.info("Row count (%s): %d", primary_csv.name, metrics.row_count)
-                except Exception as exc:
-                    log.warning("Could not count CSV rows: %s", exc)
-        elif dest_file.suffix.lower() == ".csv":
+            if count_rows:
+                csvs = [p for p in extracted if p.suffix.lower() == ".csv"]
+                if csvs:
+                    # Prefer data CSVs (prefixed "API_") over metadata CSVs.
+                    # World Bank ZIPs contain both; without this we'd count the
+                    # 1-row Metadata_Indicator file instead of the actual dataset.
+                    data_csvs = [p for p in csvs if p.name.startswith("API_")]
+                    primary_csv = data_csvs[0] if data_csvs else csvs[0]
+                    try:
+                        metrics.row_count = file_utils.count_csv_rows(primary_csv)
+                        log.info("Row count (%s): %d", primary_csv.name, metrics.row_count)
+                    except Exception as exc:
+                        log.warning("Could not count CSV rows: %s", exc)
+        elif dest_file.suffix.lower() == ".csv" and count_rows:
             try:
                 metrics.row_count = file_utils.count_csv_rows(dest_file)
                 log.info("Row count: %d", metrics.row_count)
