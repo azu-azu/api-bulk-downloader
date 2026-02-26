@@ -38,3 +38,4 @@ downloads/
 
 # Project-specific
 .claude/
+api_bulk_downloader/connectors/sf.py
