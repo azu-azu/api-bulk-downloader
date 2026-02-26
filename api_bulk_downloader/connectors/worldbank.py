@@ -15,6 +15,7 @@ Reference:
 """
 import logging
 from dataclasses import dataclass, field
+from urllib.parse import urlencode, quote
 
 log = logging.getLogger(__name__)
 
@@ -55,8 +56,7 @@ class WorldBankConnector:
         Returns a ZIP archive with the indicator data and two metadata CSVs.
         """
         params = {"downloadformat": "csv", **self.extra_params}
-        query = "&".join(f"{k}={v}" for k, v in params.items())
-        url = f"{_WB_INDICATOR_BASE}/{self.indicator}?{query}"
+        url = f"{_WB_INDICATOR_BASE}/{quote(self.indicator, safe='')}?{urlencode(params)}"
         log.debug("World Bank indicator URL: %s", url)
         return url
 
