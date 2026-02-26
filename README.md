@@ -96,18 +96,18 @@ flowchart TD
     subgraph Core
         DL["BulkDownloader\n(downloader.py)"]
         SESSION["requests.Session\n+ urllib3.Retry\n(429/5xx リトライ)"]
-        FU["file_utils.py"]
     end
 
     subgraph ファイル操作
         STREAM["stream_to_file()\n8KB チャンク書き込み"]
+        ISZIP{is_zip?}
         UNZIP["extract_zip()"]
         COUNT["count_csv_rows()"]
     end
 
     subgraph 出力 dest_dir
-        ZIP["*.zip"]
-        CSV["*.csv\n(展開済み)"]
+        ZIP["*.zip (optional)"]
+        CSV["*.csv (optional)"]
     end
 
     METRICS["DownloadMetrics\n(bytes / rows / duration)"]
@@ -129,12 +129,14 @@ flowchart TD
     REMOTE -->|"chunked response"| SESSION
     SESSION --> STREAM
     STREAM -->|"bytes_downloaded"| DL
-    STREAM --> ZIP
+    STREAM --> ISZIP
 
-    DL -->|"is_zip?"| UNZIP
+    ISZIP -->|Yes| ZIP
+    ZIP --> UNZIP
     UNZIP --> CSV
+    ISZIP -->|No| CSV
 
-    DL -->|"count_rows?"| COUNT
+    CSV -->|"count_rows?"| COUNT
     COUNT -->|"row_count"| DL
 
     DL --> METRICS
@@ -143,4 +145,5 @@ flowchart TD
     style CFG_FILE fill:#f5f0e8,stroke:#b8a070
     style REMOTE fill:#e8f0fe,stroke:#4a7fcb
     style METRICS fill:#e8f5e9,stroke:#4caf50
+    style ISZIP fill:#fff8e1,stroke:#f9a825
 ```
