@@ -104,20 +104,18 @@ class BulkDownloader:
             if count_rows:
                 csvs = [p for p in extracted if p.suffix.lower() == ".csv"]
                 if csvs:
-                    # "API_" プレフィックスのデータCSVをメタデータCSVより優先する。
-                    # World Bank ZIPには両方含まれており、優先しないと
-                    # Metadata_Indicator（1行）をカウントしてしまう。
-                    data_csvs = [p for p in csvs if p.name.startswith("API_")]
-                    primary_csv = data_csvs[0] if data_csvs else csvs[0]
                     try:
+                        primary_csv = file_utils.choose_primary_csv(csvs)
                         metrics.row_count = file_utils.count_csv_rows(primary_csv)
-                        log.info("Row count (%s): %d", primary_csv.name, metrics.row_count)
+                        log.info(
+                            "Row count (%s): %d", primary_csv.name, metrics.row_count
+                        )
                     except Exception as exc:
                         log.warning("Could not count CSV rows: %s", exc)
         elif dest_file.suffix.lower() == ".csv" and count_rows:
             try:
                 metrics.row_count = file_utils.count_csv_rows(dest_file)
-                log.info("Row count: %d", metrics.row_count)
+                log.info("Row count (%s): %d", dest_file.name, metrics.row_count)
             except Exception as exc:
                 log.warning("Could not count CSV rows: %s", exc)
 
