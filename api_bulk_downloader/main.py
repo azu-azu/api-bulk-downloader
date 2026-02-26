@@ -59,6 +59,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Maximum number of HTTP retries (default: 3)",
     )
     parser.add_argument(
+        "--count-rows",
+        action="store_true",
+        help="Count data rows in the downloaded CSV after extraction (default: off).",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable DEBUG-level logging",
@@ -92,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Destination : %s/%s", dest_dir, filename)
 
     try:
-        metrics = downloader.download(filename)
+        metrics = downloader.download(filename, count_rows=args.count_rows)
     except Exception as exc:
         logger.error("Download failed: %s", exc)
         return 1
