@@ -12,7 +12,7 @@ api_bulk_downloader/
 │   └── logger.py       # Logging setup and DownloadMetrics dataclass
 ├── connectors/
 │   ├── worldbank.py    # World Bank Indicators API connector
-│   └── salesforce.py   # Salesforce Bulk API 2.0 (placeholder)
+│   └──
 └── main.py             # CLI entry point
 ```
 
