@@ -9,11 +9,13 @@ api_bulk_downloader/
 ├── core/
 │   ├── config.py       # Persistent output-dir config (load/save ~/.config/.../config.json)
 │   ├── downloader.py   # Streaming downloader with retry/backoff (connector-agnostic)
-│   ├── file_utils.py   # Chunk writes, ZIP extraction, CSV row counting
+│   ├── file_utils.py   # Chunk writes, ZIP extraction, primary CSV selection, row counting
 │   └── logger.py       # Logging setup and DownloadMetrics dataclass
 ├── connectors/
 │   └── worldbank.py    # World Bank Indicators API connector
-└── main.py             # CLI entry point
+├── main.py             # CLI entry point
+tests/
+└── test_file_utils.py  # Unit tests for file_utils (choose_primary_csv)
 ```
 
 ## Quick Start
@@ -21,8 +23,11 @@ api_bulk_downloader/
 ```bash
 pip install -r requirements.txt
 
-# Download World Bank GDP data (default)
+# Download World Bank GDP data (default, saves to ./downloads)
 python -m api_bulk_downloader.main
+
+# Persist an output directory (written to ~/.config/api_bulk_downloader/config.json)
+python -m api_bulk_downloader.main --set-dest /data/worldbank
 
 # Specify a different indicator and output directory
 python -m api_bulk_downloader.main --indicator SP.POP.TOTL --dest data/
@@ -37,8 +42,9 @@ python -m api_bulk_downloader.main --help
 
 | Layer | Responsibility |
 |-------|---------------|
+| `core/config.py` | Persist and load output directory (`~/.config/.../config.json`) |
 | `core/downloader.py` | HTTP streaming, retry logic, orchestration — no API knowledge |
-| `core/file_utils.py` | File I/O: chunked writes, ZIP extraction, CSV counting |
+| `core/file_utils.py` | File I/O: chunked writes, ZIP extraction, primary CSV selection, row counting |
 | `core/logger.py` | Logging config, `DownloadMetrics` (start/end/duration/bytes/rows) |
 | `connectors/*` | API-specific URL building and authentication headers |
 
@@ -111,7 +117,7 @@ flowchart TD
     end
 
     METRICS["DownloadMetrics\n(bytes / rows / duration)"]
-    REMOTE["World Bank API\n(HTTPS)"]
+    REMOTE["Remote API\n(HTTPS)"]
 
     CLI -->|"--set-dest"| CFG
     CFG <-->|読み書き| CFG_FILE
