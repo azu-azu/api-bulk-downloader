@@ -1,16 +1,16 @@
 """
-World Bank Open Data connectors.
+World Bank Open Data コネクタ。
 
-Two connectors are provided:
+2種類のコネクタを提供する:
 
-* ``WorldBankConnector``     — single indicator download (~100 KB–1 MB each).
-* ``WorldBankWDIConnector``  — full World Development Indicators bulk ZIP
-                               (~50 MB compressed / ~500 MB uncompressed).
-                               Use this one for large-file streaming practice.
+* ``WorldBankConnector``     — 単一指標のダウンロード（1件あたり約100KB〜1MB）。
+* ``WorldBankWDIConnector``  — World Development Indicators 全量バルクZIP
+                               （圧縮約50MB・解凍約500MB）。
+                               大ファイルのストリーミング練習にはこちらを使う。
 
-Authentication is not required for either endpoint.
+いずれのエンドポイントも認証不要。
 
-Reference:
+参考:
     https://datahelpdesk.worldbank.org/knowledgebase/articles/898581
 """
 import logging
@@ -21,8 +21,8 @@ log = logging.getLogger(__name__)
 
 _WB_INDICATOR_BASE = "https://api.worldbank.org/v2/en/indicator"
 
-# Full WDI bulk download — all indicators × all countries × all years in one ZIP.
-# Compressed: ~50 MB  |  Uncompressed: ~500 MB
+# WDI全量バルクダウンロード — 全指標 × 全国 × 全年を1つのZIPで提供。
+# 圧縮: 約50MB  |  解凍後: 約500MB
 _WDI_BULK_URL = (
     "https://databankfiles.worldbank.org/public/ddpext_download/WDI_CSV.zip"
 )
@@ -31,18 +31,18 @@ _WDI_BULK_URL = (
 @dataclass
 class WorldBankConnector:
     """
-    Connector for a single World Bank indicator (bulk CSV download).
+    単一のWorld Bank指標をバルクCSVでダウンロードするコネクタ。
 
-    Suitable for quick tests. For large-file streaming practice use
-    :class:`WorldBankWDIConnector` instead.
+    簡易テスト向け。大ファイルのストリーミング練習には
+    :class:`WorldBankWDIConnector` を使うこと。
 
     Parameters
     ----------
     indicator:
-        World Bank indicator code, e.g. ``"NY.GDP.MKTP.CD"`` (GDP current USD).
+        World Bank指標コード。例: ``"NY.GDP.MKTP.CD"``（GDP・米ドル現在価格）。
     extra_params:
-        Optional query-string parameters appended to the URL
-        (e.g. ``{"mrv": "10"}`` for most-recent 10 values).
+        URLに追加するクエリパラメータ（省略可）。
+        例: ``{"mrv": "10"}`` で直近10件のみ取得。
     """
 
     indicator: str
@@ -51,9 +51,9 @@ class WorldBankConnector:
     @property
     def download_url(self) -> str:
         """
-        Construct the World Bank bulk CSV download URL for a single indicator.
+        単一指標のバルクCSVダウンロードURLを構築する。
 
-        Returns a ZIP archive with the indicator data and two metadata CSVs.
+        指標データと2つのメタデータCSVを含むZIPアーカイブが返される。
         """
         params = {"downloadformat": "csv", **self.extra_params}
         url = f"{_WB_INDICATOR_BASE}/{quote(self.indicator, safe='')}?{urlencode(params)}"
@@ -72,13 +72,13 @@ class WorldBankConnector:
 @dataclass
 class WorldBankWDIConnector:
     """
-    Connector for the full World Development Indicators (WDI) bulk download.
+    World Development Indicators（WDI）全量バルクダウンロードコネクタ。
 
-    Downloads ALL indicators for ALL countries and years in a single ZIP.
-    Compressed size is ~50 MB; uncompressed ~500 MB — making it ideal for
-    practising streaming, chunked writes, and large CSV processing.
+    全指標・全国・全年のデータを1つのZIPでダウンロードする。
+    圧縮約50MB・解凍約500MB と大きく、ストリーミングやチャンク書き込み、
+    大規模CSV処理の練習に最適。
 
-    No parameters required; the URL is fixed by the World Bank.
+    URLはWorld Bankが固定しているためパラメータ不要。
     """
 
     @property

@@ -1,7 +1,7 @@
 """
-Core streaming downloader with retry / exponential backoff.
+リトライ・指数バックオフ付きのコアストリーミングダウンローダー。
 
-Contains no API-specific logic — all connector details live in connectors/.
+API固有のロジックは一切持たない。コネクタの詳細は connectors/ に集約する。
 """
 import logging
 import time
@@ -19,31 +19,31 @@ log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Connector protocol — every connector must expose these two attributes
+# コネクタプロトコル — すべてのコネクタはこの2つのプロパティを実装する
 # ---------------------------------------------------------------------------
 
 class ConnectorProtocol(Protocol):
-    """Minimal interface that any data-source connector must satisfy."""
+    """データソースコネクタが満たすべき最小インターフェース。"""
 
     @property
     def download_url(self) -> str:
-        """Full URL to the resource being downloaded."""
+        """ダウンロード対象リソースの完全URL。"""
         ...
 
     @property
     def request_headers(self) -> dict[str, str]:
-        """HTTP headers to include in the download request (auth, etc.)."""
+        """ダウンロードリクエストに付与するHTTPヘッダ（認証情報など）。"""
         ...
 
 
 # ---------------------------------------------------------------------------
-# Downloader
+# ダウンローダー
 # ---------------------------------------------------------------------------
 
 class BulkDownloader:
     """
-    Downloads a single resource from a connector, streams it to disk,
-    optionally extracts ZIP archives, and logs metrics.
+    コネクタからリソースを1つダウンロードし、ディスクへストリーム書き込みする。
+    ZIPアーカイブは自動展開し、計測値をログに出力する。
     """
 
     def __init__(
@@ -63,26 +63,29 @@ class BulkDownloader:
         self._session = self._build_session(max_retries, backoff_factor)
 
     # ------------------------------------------------------------------
-    # Public API
+    # 公開API
     # ------------------------------------------------------------------
 
     def download(self, filename: str, *, count_rows: bool = False) -> DownloadMetrics:
         """
-        Stream the connector's resource to *dest_dir/filename*.
+        コネクタのリソースを *dest_dir/filename* へストリーム書き込みする。
 
-        If the downloaded file is a ZIP archive it is automatically extracted
-        and the archive itself is kept alongside the extracted contents.
+        ダウンロードしたファイルがZIPアーカイブの場合は自動的に展開し、
+        アーカイブ本体は展開先と同じディレクトリに保持する。
 
         Parameters
         ----------
         filename:
-            Name of the file to write inside *dest_dir*.
+            *dest_dir* 内に書き込むファイル名。
         count_rows:
-            When True, count data rows in the primary CSV after download.
-            Disabled by default because it requires a full file scan and can
-            add noticeable time for large datasets (e.g. ~2 s for 400 K rows).
+            True のとき、ダウンロード後に主要CSVのデータ行数を数える。
+            ファイル全体を再スキャンするためデフォルトは無効。
+            大規模データ（40万行超）では約2秒の追加コストがかかる。
 
-        Returns a populated :class:`DownloadMetrics` instance.
+        Returns
+        -------
+        DownloadMetrics
+            計測値が格納されたインスタンス。
         """
         metrics = DownloadMetrics()
         dest_file = self._dest_dir / filename
@@ -94,16 +97,16 @@ class BulkDownloader:
             response, dest_file, chunk_size=self._chunk_size
         )
 
-        # Unzip if necessary
+        # ZIPなら展開する
         if file_utils.is_zip(dest_file):
             log.info("Archive detected — extracting to %s", self._dest_dir)
             extracted = file_utils.extract_zip(dest_file, self._dest_dir)
             if count_rows:
                 csvs = [p for p in extracted if p.suffix.lower() == ".csv"]
                 if csvs:
-                    # Prefer data CSVs (prefixed "API_") over metadata CSVs.
-                    # World Bank ZIPs contain both; without this we'd count the
-                    # 1-row Metadata_Indicator file instead of the actual dataset.
+                    # "API_" プレフィックスのデータCSVをメタデータCSVより優先する。
+                    # World Bank ZIPには両方含まれており、優先しないと
+                    # Metadata_Indicator（1行）をカウントしてしまう。
                     data_csvs = [p for p in csvs if p.name.startswith("API_")]
                     primary_csv = data_csvs[0] if data_csvs else csvs[0]
                     try:
@@ -123,11 +126,11 @@ class BulkDownloader:
         return metrics
 
     # ------------------------------------------------------------------
-    # Internal helpers
+    # 内部ヘルパー
     # ------------------------------------------------------------------
 
     def _get(self, url: str) -> requests.Response:
-        """Execute a GET request and return the streaming response."""
+        """GETリクエストを実行してストリーミングレスポンスを返す。"""
         response = self._session.get(
             url,
             headers=self._connector.request_headers,
@@ -140,10 +143,10 @@ class BulkDownloader:
     @staticmethod
     def _build_session(max_retries: int, backoff_factor: float) -> requests.Session:
         """
-        Create a requests.Session with automatic retry on transient errors.
+        一時的なエラーに対して自動リトライする requests.Session を生成する。
 
-        Retries on HTTP 429, 500, 502, 503, 504 with exponential backoff:
-            wait = backoff_factor * (2 ** (retry_number - 1))
+        HTTP 429・500・502・503・504 を対象に指数バックオフでリトライする:
+            待機時間 = backoff_factor × 2^(リトライ回数 - 1)
         """
         retry = Retry(
             total=max_retries,
