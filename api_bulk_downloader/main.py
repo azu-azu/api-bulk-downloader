@@ -1,12 +1,12 @@
 """
-Entry point for the API Bulk Downloader.
+API Bulk Downloader のエントリーポイント。
 
-Usage
------
-    # Single indicator (small, ~100 KB)
+使い方
+------
+    # 単一指標（小サイズ、約100KB）
     python -m api_bulk_downloader.main --indicator NY.GDP.MKTP.CD
 
-    # Full WDI bulk download (large, ~50 MB compressed / ~500 MB uncompressed)
+    # WDI全量バルクダウンロード（大サイズ、圧縮約50MB・解凍約500MB）
     python -m api_bulk_downloader.main --wdi
 """
 import argparse
@@ -24,49 +24,48 @@ from api_bulk_downloader.core.logger import setup_logging
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="API Bulk Downloader — stream large datasets to disk safely."
+        description="API Bulk Downloader — 大規模データセットを安全にディスクへストリーム保存する。"
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--indicator",
         default="NY.GDP.MKTP.CD",
-        help="World Bank indicator code (default: NY.GDP.MKTP.CD — GDP current USD)",
+        help="World Bank指標コード（デフォルト: NY.GDP.MKTP.CD — GDP・米ドル現在価格）",
     )
     mode.add_argument(
         "--wdi",
         action="store_true",
         help=(
-            "Download the full World Development Indicators bulk ZIP "
-            "(~50 MB compressed, ~500 MB uncompressed). "
-            "Use this for large-file streaming practice."
+            "World Development Indicators 全量バルクZIPをダウンロードする "
+            "（圧縮約50MB・解凍約500MB）。大ファイルのストリーミング練習用。"
         ),
     )
     parser.add_argument(
         "--dest",
         default="downloads",
-        help="Destination directory for downloaded files (default: ./downloads)",
+        help="ダウンロード先ディレクトリ（デフォルト: ./downloads）",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=8192,
-        help="Streaming chunk size in bytes (default: 8192)",
+        help="ストリーミングのチャンクサイズ（バイト、デフォルト: 8192）",
     )
     parser.add_argument(
         "--retries",
         type=int,
         default=3,
-        help="Maximum number of HTTP retries (default: 3)",
+        help="HTTPリトライ上限回数（デフォルト: 3）",
     )
     parser.add_argument(
         "--count-rows",
         action="store_true",
-        help="Count data rows in the downloaded CSV after extraction (default: off).",
+        help="ダウンロード後にCSVのデータ行数を数える（デフォルト: 無効）。",
     )
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Enable DEBUG-level logging",
+        help="DEBUGレベルのログを有効にする",
     )
     return parser.parse_args(argv)
 
@@ -81,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.wdi:
         connector = WorldBankWDIConnector()
-        logger.info("Connector : WorldBank WDI (full bulk dataset)")
+        logger.info("Connector : WorldBank WDI (全量バルクデータセット)")
     else:
         connector = WorldBankConnector(indicator=args.indicator)
         logger.info("Connector : WorldBank | indicator=%s", args.indicator)

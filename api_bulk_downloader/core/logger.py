@@ -1,5 +1,5 @@
 """
-Logging setup and download metrics tracking.
+ロギング設定とダウンロード計測値の管理。
 """
 import logging
 import time
@@ -8,7 +8,7 @@ from typing import Optional
 
 
 def setup_logging(level: int = logging.INFO) -> logging.Logger:
-    """Configure root logger with a standard format."""
+    """ルートロガーを標準フォーマットで設定する。"""
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
@@ -19,15 +19,15 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
 
 @dataclass
 class DownloadMetrics:
-    """Captures timing and volume stats for a single download operation."""
+    """1回のダウンロード操作に関する時間・サイズの計測値を保持する。"""
 
     start_time: float = field(default_factory=time.time)
     end_time: Optional[float] = None
     bytes_downloaded: int = 0
-    row_count: Optional[int] = None  # populated only for CSV files
+    row_count: Optional[int] = None  # CSVファイルの場合のみ設定される
 
     def finish(self) -> None:
-        """Mark the download as complete and record end time."""
+        """ダウンロード完了を記録し、終了時刻を保存する。"""
         self.end_time = time.time()
 
     @property
@@ -37,7 +37,7 @@ class DownloadMetrics:
         return round(self.end_time - self.start_time, 3)
 
     def log(self, logger: logging.Logger) -> None:
-        """Emit a structured summary to the logger."""
+        """計測サマリーをロガーに出力する。"""
         logger.info(
             "Download complete | "
             "start=%.3f end=%.3f duration=%ss bytes=%d rows=%s",
