@@ -76,3 +76,71 @@ Retries on HTTP 429, 500, 502, 503, 504.
 | `duration_seconds` | Wall-clock duration |
 | `bytes_downloaded` | Raw bytes written to disk |
 | `row_count` | CSV data rows (header excluded); `n/a` for non-CSV |
+
+### Data Flow
+
+```mermaid
+flowchart TD
+    CLI["main.py\n(argparse)"]
+
+    subgraph 設定解決
+        CFG_FILE["~/.config/.../config.json"]
+        CFG["core/config.py\nload_dest / save_dest"]
+    end
+
+    subgraph Connector
+        WBC["WorldBankConnector\n(単一指標)"]
+        WDIC["WorldBankWDIConnector\n(WDI全量)"]
+    end
+
+    subgraph Core
+        DL["BulkDownloader\n(downloader.py)"]
+        SESSION["requests.Session\n+ urllib3.Retry\n(429/5xx リトライ)"]
+        FU["file_utils.py"]
+    end
+
+    subgraph ファイル操作
+        STREAM["stream_to_file()\n8KB チャンク書き込み"]
+        UNZIP["extract_zip()"]
+        COUNT["count_csv_rows()"]
+    end
+
+    subgraph 出力 dest_dir
+        ZIP["*.zip"]
+        CSV["*.csv\n(展開済み)"]
+    end
+
+    METRICS["DownloadMetrics\n(bytes / rows / duration)"]
+    REMOTE["World Bank API\n(HTTPS)"]
+
+    CLI -->|"--set-dest"| CFG
+    CFG <-->|読み書き| CFG_FILE
+    CFG -->|"load_dest()"| CLI
+
+    CLI -->|"dest_dir\nconnector\nchunk_size\nmax_retries"| DL
+
+    CLI --> WBC
+    CLI --> WDIC
+    WBC -->|"download_url\nrequest_headers"| DL
+    WDIC -->|"download_url\nrequest_headers"| DL
+
+    DL --> SESSION
+    SESSION -->|"GET stream=True"| REMOTE
+    REMOTE -->|"chunked response"| SESSION
+    SESSION --> STREAM
+    STREAM -->|"bytes_downloaded"| DL
+    STREAM --> ZIP
+
+    DL -->|"is_zip?"| UNZIP
+    UNZIP --> CSV
+
+    DL -->|"count_rows?"| COUNT
+    COUNT -->|"row_count"| DL
+
+    DL --> METRICS
+    METRICS -->|"log.info"| CLI
+
+    style CFG_FILE fill:#f5f0e8,stroke:#b8a070
+    style REMOTE fill:#e8f0fe,stroke:#4a7fcb
+    style METRICS fill:#e8f5e9,stroke:#4caf50
+```
