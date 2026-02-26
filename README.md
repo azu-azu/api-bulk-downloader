@@ -108,12 +108,13 @@ flowchart TD
         STREAM["stream_to_file()\n8KB チャンク書き込み"]
         ISZIP{is_zip?}
         UNZIP["extract_zip()"]
+        SELECT["choose_primary_csv()"]
         COUNT["count_csv_rows()"]
     end
 
     subgraph 出力 dest_dir
         ZIP["*.zip (optional)"]
-        CSV["*.csv (optional)"]
+        CSVS["*.csv (0..n)"]
     end
 
     METRICS["DownloadMetrics\n(bytes / rows / duration)"]
@@ -139,10 +140,11 @@ flowchart TD
 
     ISZIP -->|Yes| ZIP
     ZIP --> UNZIP
-    UNZIP --> CSV
-    ISZIP -->|No| CSV
+    UNZIP --> CSVS
+    ISZIP -->|No| CSVS
 
-    CSV -->|"count_rows?"| COUNT
+    CSVS -->|"count_rows?"| SELECT
+    SELECT --> COUNT
     COUNT -->|"row_count"| DL
 
     DL --> METRICS
