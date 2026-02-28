@@ -135,43 +135,52 @@ The materialized API data is always available as a DuckDB table named `dataset`.
 
 ```mermaid
 flowchart LR
-    MANIFEST[/"manifest.yaml"/]
-    SQL_FILE[/"timeseries.sql"/]
+    CLI["Entry Point<br>-----<br><br><u><b>cli.py</b></u><br>run_pipeline()"]
 
-    MANIFEST --> CLI["cli.py\nrun_pipeline()"]
+    %% inputs (auxiliary)
+    subgraph PRE ["事前設定"]
+        MANIFEST[/"<u><b>configs/manifest.yaml</b></u><br>詳細設定"/]
+        SQL_FILE[/"<u><b>queries/worldbank/timeseries.sql</b></u><br>SQLテンプレ"/]
+    end
+    %% auxiliary (dashed) to show "inputs"
+    MANIFEST -.->|"--manifest"| CLI
+    SQL_FILE -.->|"--sql file"| CLI
+
+    %% runtime flow
     CLI -->|"--dry-run"| SKIP(["⏭ skipped"])
     CLI --> CONN
 
-    subgraph CONN ["WorldBankIndicatorConnector"]
-        DISC["discover()\nfixed schema · no network"]
-        MAT["materialize()\npage loop"]
-        DISC -->|"--probe"| PROBED(["⏭ columns logged"])
+    subgraph CONN ["<u><b>connectors/worldbank_indicator.py</b></u>"]
+        DISC["Schema Discovery<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>discover()<br>固定スキーマ・ネットワーク不要"]
+        MAT["Data Fetch<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>materialize()<br>ページループ"]
+        DISC -->|"--probe"| PROBED(["⏭ probe完了<br>カラム確認のみ"])
         DISC -->|full run| MAT
     end
 
-    MAT <-->|"GET /v2/country/{cc}/indicator/{ic}?page=N\n← [{meta}, [{records}]]"| WB[/"World Bank\nIndicator API"/]
+    MAT <-->|"GET /v2/country/{cc}/indicator/{ic}?page=N<br>← [{meta}, [{records}]]"| WB[/"<u><b>World Bank Indicator API</b></u><br>JSONページング · urllib3.Retry"/]
 
-    MAT -->|"INSERT rows\n(page by page)"| DS
+    MAT -->|"INSERT rows<br>(page by page)"| DS
 
-    subgraph DUCK ["DuckDB  (per-job, in-process)"]
-        DS[("TABLE dataset\ncountry_code · country_name\nindicator_code · indicator_name\nyear · value")]
+    subgraph DUCK ["<u><b>DuckDB</b></u>（ジョブごと・インプロセス）"]
+        DS[("TABLE dataset<br>-----<br>country_code · country_name<br>indicator_code · indicator_name<br>year · value")]
     end
 
-    SQL_FILE --> RENDER["sql_template.render()\n{{key}} → SQL literal"]
-    DS --> RENDER
-    RENDER --> EXPORT["exporter.export()\nCREATE TEMP VIEW\nCOPY TO file"]
+    %% SQL render
+    DS --> RENDER["SQL Render<br>-----<br><br><u><b>sql_template.py</b></u><br>render()<br>{{key}} → SQLリテラル"]
+    RENDER --> EXPORT["Export<br>-----<br><br><u><b>exporter.py</b></u><br>export()<br>CREATE TEMP VIEW → COPY TO file"]
 
-    EXPORT --> OUT_DATA[/"*.csv / *.parquet"/]
-    EXPORT --> OUT_SUM[/"*_summary.json"/]
+    %% outputs
+    EXPORT --> OUT_DATA[/"<u><b>outputs/</b></u><br>*.csv / *.parquet"/]
+    EXPORT --> OUT_SUM[/"<u><b>outputs/</b></u><br>*_summary.json"/]
 
-    classDef file    fill:#e8f0fe,stroke:#4a7fcb
-    classDef ext     fill:#fff3e0,stroke:#e6a817
-    classDef db      fill:#e8f5e9,stroke:#43a047
-    classDef term    fill:#f3e5f5,stroke:#8e24aa
-    classDef out     fill:#fce4ec,stroke:#e91e63
+    classDef file    fill:#e8f0fe,stroke:#4a7fcb, color:#000
+    classDef ext     fill:#fff3e0,stroke:#e6a817, color:#000
+    classDef db      fill:#e8f5e9,stroke:#43a047, color:#000
+    classDef term    fill:#f3e5f5,stroke:#8e24aa, color:#000
+    classDef out     fill:#fce4ec,stroke:#e91e63, color:#000
 
     class MANIFEST,SQL_FILE file
-    class WB ext
+    class WB,CLI ext
     class DS db
     class SKIP,PROBED term
     class OUT_DATA,OUT_SUM out
