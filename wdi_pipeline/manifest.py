@@ -30,6 +30,7 @@ class SchemaConfig:
 class ExportConfig:
     filename: str
     format: str = "csv"
+    subdir: str = ""  # optional subdirectory under output_root
 
 
 @dataclass
@@ -158,7 +159,8 @@ def _parse_job(
             f"Known formats: {sorted(_KNOWN_FORMATS)}"
         )
     filename = raw_export.get("filename") or name
-    export_cfg = ExportConfig(filename=filename, format=fmt)
+    subdir = raw_export.get("subdir") or ""
+    export_cfg = ExportConfig(filename=filename, format=fmt, subdir=subdir)
 
     # schema
     raw_schema = raw.get("schema")

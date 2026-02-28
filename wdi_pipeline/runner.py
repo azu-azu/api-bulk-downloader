@@ -96,7 +96,8 @@ def _run_job(
             rendered_sql, values = render(sql_text, job.sql.params)
 
             ext = "csv" if job.export.format == "csv" else "parquet"
-            dest = (output_root / f"{job.export.filename}.{ext}").resolve()
+            base = output_root / job.export.subdir if job.export.subdir else output_root
+            dest = (base / f"{job.export.filename}.{ext}").resolve()
 
             rows = export(conn, rendered_sql, values, dest, job.export.format)
         finally:
