@@ -164,54 +164,73 @@ The materialized API data is always available as a DuckDB table named `dataset`.
 
 ```mermaid
 flowchart LR
-    CLI["Entry Point<br>-----<br><br><u><b>cli.py</b></u><br>run_pipeline()"]
+    CLI["Entry Point<br>-----<br><br><u><b>cli.py</b></u><br>main()<br>argparse · モード選択"]
+
+    RUN["Job Loop<br>-----<br><br><u><b>runner.py</b></u><br>run_pipeline()<br>dry-run / probe / full の分岐"]
+
+    MAN["Config Load<br>-----<br><br><u><b>manifest.py</b></u><br>load_manifest()<br>YAML 解析 + スキーマ構築"]
 
     %% inputs (auxiliary)
     subgraph PRE ["事前設定"]
-        MANIFEST[/"<u><b>configs/manifest.yaml</b></u><br>詳細設定"/]
-        SQL_FILE[/"<u><b>queries/worldbank/timeseries.sql</b></u><br>SQLテンプレ"/]
+        MF[/"<u><b>configs/manifest.yaml</b></u><br>ジョブ定義"/]
+        SCH[/"<u><b>schemas/*.yaml</b></u><br>列定義 (name · type)"/]
+        SQL_FILE[/"<u><b>queries/**/*.sql</b></u><br>SQL テンプレ"/]
     end
-    %% auxiliary (dashed) to show "inputs"
-    MANIFEST -.-> CLI
-    MANIFEST -.-> SQL_FILE
 
-
-    %% runtime flow
-    CLI -->|"--dry-run"| SKIP(["⏭ skipped"])
-    CLI --> CONN
+    SKIP(["⏭ skipped"])
 
     subgraph CONN ["<u><b>connectors/worldbank_indicator.py</b></u>"]
-        DISC["Schema Discovery<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>discover()<br>job.schema から列名取得・ネットワーク不要"]
-        MAT["Data Fetch<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>materialize()<br>ページループ"]
-        DISC -->|"--probe"| PROBED(["⏭ probe完了<br>カラム確認のみ"])
-        DISC -->|full run| MAT
+        DISC["Schema Discovery<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>discover()<br>job.schema から列名取得"]
+        MAT["Data Fetch<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>materialize()<br>ページループ · INSERT"]
     end
 
-    MAT <-->|"GET /v2/country/{cc}/indicator/{ic}?page=N<br>← [{meta}, [{records}]]"| WB[/"<u><b>World Bank Indicator API</b></u><br>JSONページング · urllib3.Retry"/]
+    PROBED(["⏭ probe 完了<br>列名確認のみ"])
 
+    WB[/"<u><b>World Bank Indicator API</b></u><br>JSON ページング · urllib3.Retry"/]
+
+    DS[("TABLE dataset<br>-----<br>country_code · country_name<br>indicator_code · indicator_name<br>year · value")]
+
+    RENDER["SQL Render<br>-----<br><br><u><b>sql_template.py</b></u><br>render()<br>{{key}} → SQL リテラル"]
+
+    EXPORT["Export<br>-----<br><br><u><b>exporter.py</b></u><br>export()<br>CREATE TEMP VIEW → COPY TO file"]
+
+    SUM["Summary<br>-----<br><br><u><b>summary.py</b></u><br>write()<br>ジョブ結果を JSON 出力"]
+
+    OUT_DATA[/"<u><b>outputs/</b></u><br>*.csv / *.parquet"/]
+    OUT_SUM[/"<u><b>outputs/</b></u><br>*_summary.json"/]
+
+    %% main flow
+    CLI --> RUN
+    RUN --> MAN
+    MF -.->|"load"| MAN
+    MAN -.->|"schema.file"| SCH
+    MAN -.->|"sql.file"| SQL_FILE
+
+    RUN -->|"--dry-run"| SKIP
+    RUN --> DISC
+
+    DISC -->|"--probe"| PROBED
+    DISC -->|"full run"| MAT
+
+    MAT <-->|"GET /v2/country/{cc}/indicator/{ic}?page=N<br>← [{meta}, [{records}]]"| WB
     MAT -->|"INSERT rows<br>(page by page)"| DS
 
-    subgraph DUCK ["<u><b>DuckDB</b></u>（ジョブごと・インプロセス）"]
-        DS[("TABLE dataset<br>-----<br>country_code · country_name<br>indicator_code · indicator_name<br>year · value")]
-    end
+    DS --> RENDER
+    SQL_FILE -.->|"template"| RENDER
+    RENDER --> EXPORT
+    EXPORT --> OUT_DATA
+    EXPORT --> SUM
+    SUM --> OUT_SUM
 
-    %% SQL render
-    DS --> RENDER["SQL Render<br>-----<br><br><u><b>sql_template.py</b></u><br>render()<br>{{key}} → SQLリテラル"]
-    RENDER --> EXPORT["Export<br>-----<br><br><u><b>exporter.py</b></u><br>export()<br>CREATE TEMP VIEW → COPY TO file"]
-
-    %% outputs
-    EXPORT --> OUT_DATA[/"<u><b>outputs/</b></u><br>*.csv / *.parquet"/]
-    EXPORT --> OUT_SUM[/"<u><b>outputs/</b></u><br>*_summary.json"/]
-
-    classDef entry   fill:#e0f7fa,stroke:#0097a7, color:#000
-    classDef file    fill:#e8f0fe,stroke:#4a7fcb, color:#000
-    classDef ext     fill:#fff3e0,stroke:#e6a817, color:#000
-    classDef db      fill:#e8f5e9,stroke:#43a047, color:#000
-    classDef term    fill:#f3e5f5,stroke:#8e24aa, color:#000
-    classDef out     fill:#fce4ec,stroke:#e91e63, color:#000
+    classDef entry fill:#e0f7fa,stroke:#0097a7,color:#000
+    classDef file  fill:#e8f0fe,stroke:#4a7fcb,color:#000
+    classDef ext   fill:#fff3e0,stroke:#e6a817,color:#000
+    classDef db    fill:#e8f5e9,stroke:#43a047,color:#000
+    classDef term  fill:#f3e5f5,stroke:#8e24aa,color:#000
+    classDef out   fill:#fce4ec,stroke:#e91e63,color:#000
 
     class CLI entry
-    class MANIFEST,SQL_FILE file
+    class MF,SCH,SQL_FILE file
     class WB ext
     class DS db
     class SKIP,PROBED term
