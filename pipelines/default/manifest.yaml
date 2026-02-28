@@ -16,6 +16,7 @@ jobs:
     export:
       format: parquet
       filename: gdp_jpn
+      subdir: worldbank
     schema:
       file: schemas/timeseries.yaml
 
@@ -31,5 +32,6 @@ jobs:
         min_year: "2000"
     export:
       filename: population_latam
+      subdir: worldbank
     schema:
       file: schemas/timeseries.yaml
