@@ -1,7 +1,7 @@
 """CLI entry point for the batch data pipeline.
 
 Usage:
-    wdi-pipeline run --manifest configs/manifest.yaml [--dry-run] [--probe] [--only JOB_NAME]
+    wdi-pipeline run --manifest pipelines/default/manifest.yaml [--dry-run] [--probe] [--only JOB_NAME]
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         manifest_path = Path(args.manifest)
-        manifest = load_manifest(manifest_path, base_dir=Path.cwd())
+        manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
         summaries = run_pipeline(
             manifest,
             dry_run=args.dry_run,

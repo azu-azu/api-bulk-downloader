@@ -24,13 +24,14 @@ api-bulk-downloader/
 │   └── connectors/
 │       ├── protocol.py            #   ConnectorProtocol, DiscoveryResult
 │       └── worldbank_indicator.py #   JSON paging + Session DI
-├── queries/
-│   └── worldbank/
-│       └── timeseries.sql         # default SQL template
-├── schemas/
-│   └── worldbank_timeseries.yaml  # column definitions (name + DuckDB type)
-├── configs/
-│   └── manifest.yaml              # job definitions
+├── pipelines/                     # pipeline definitions (one subdir per pipeline)
+│   └── default/                   #   WorldBank WDI pipeline
+│       ├── manifest.yaml          #     job definitions
+│       ├── queries/
+│       │   └── worldbank/
+│       │       └── timeseries.sql #     SQL template
+│       └── schemas/
+│           └── worldbank_timeseries.yaml  # column definitions (name + DuckDB type)
 ├── tests/                         # 30 unit tests
 ├── archive/
 │   └── api_bulk_downloader_v1/    # v1 reference (ZIP/stream approach)
@@ -54,19 +55,19 @@ This installs the `wdi-pipeline` command and all dependencies
 
 ```bash
 # Validate manifest structure — no network calls
-wdi-pipeline run --manifest configs/manifest.yaml --dry-run
+wdi-pipeline run --manifest pipelines/default/manifest.yaml --dry-run
 
 # Discover column schema only — no data fetched
-wdi-pipeline run --manifest configs/manifest.yaml --probe
+wdi-pipeline run --manifest pipelines/default/manifest.yaml --probe
 
 # Run all enabled jobs
-wdi-pipeline run --manifest configs/manifest.yaml
+wdi-pipeline run --manifest pipelines/default/manifest.yaml
 
 # Run a single job
-wdi-pipeline run --manifest configs/manifest.yaml --only gdp_jpn
+wdi-pipeline run --manifest pipelines/default/manifest.yaml --only gdp_jpn
 
 # Verbose logging
-wdi-pipeline run --manifest configs/manifest.yaml --log-level DEBUG
+wdi-pipeline run --manifest pipelines/default/manifest.yaml --log-level DEBUG
 ```
 
 | Mode | `discover()` | `materialize()` | SQL / export |
@@ -79,7 +80,7 @@ wdi-pipeline run --manifest configs/manifest.yaml --log-level DEBUG
 
 ## Manifest
 
-Jobs are declared in `configs/manifest.yaml`:
+Jobs are declared in `pipelines/default/manifest.yaml`:
 
 ```yaml
 defaults:
@@ -172,7 +173,7 @@ flowchart LR
 
     %% inputs (auxiliary)
     subgraph PRE ["事前設定"]
-        MF[/"<u><b>configs/manifest.yaml</b></u><br>ジョブ定義"/]
+        MF[/"<u><b>pipelines/default/manifest.yaml</b></u><br>job定義"/]
         SCH[/"<u><b>schemas/*.yaml</b></u><br>列定義 (name · type)"/]
         SQL_FILE[/"<u><b>queries/**/*.sql</b></u><br>SQL テンプレ"/]
     end
@@ -210,6 +211,7 @@ flowchart LR
     RUN -->|"enabled: true の job"| DISC
     RUN -.->|"duckdb.connect()<br>（in-memory）"| DS
 
+    DISC -->|"returns DiscoveryResult(columns,...)"| RUN
     DISC -->|"--probe"| PROBED
     DISC -->|"full run"| MAT
 
