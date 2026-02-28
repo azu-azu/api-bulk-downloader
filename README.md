@@ -203,9 +203,9 @@ The materialized API data is always available as a DuckDB table named `dataset`.
 
 ```mermaid
 flowchart LR
-    CLI["Entry Point<br>-----<br><br><u><b>cli.py</b></u><br>main()"]
+    CLI["Entry Point<br>-----<br><br><u><b>cli.py</b></u><br>main()<br><br>全実行の場合は<br>ここでループする"]
 
-    RUN["Job Loop<br>-----<br><br><u><b>runner.py</b></u><br>run_pipeline()<br>job を順に実行する"]
+    RUN["Job Executor<br>-----<br><br><u><b>runner.py</b></u><br>run_pipeline()<br><br>1 manifest の <br>job を実行する"]
 
     MAN["Config Load<br>-----<br><br><u><b>manifest.py</b></u><br>load_manifest()<br>job.schema を作る"]
 
