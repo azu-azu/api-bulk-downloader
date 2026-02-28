@@ -24,14 +24,16 @@ api-bulk-downloader/
 │   └── connectors/
 │       ├── protocol.py            #   ConnectorProtocol, DiscoveryResult
 │       └── worldbank_indicator.py #   JSON paging + Session DI
-├── pipelines/                     # pipeline definitions (one subdir per pipeline)
-│   └── default/                   #   WorldBank WDI pipeline
-│       ├── manifest.yaml          #     job definitions
-│       ├── queries/
-│       │   └── timeseries.sql     #     SQL template
-│       └── schemas/
-│           └── timeseries.yaml  # column definitions (name + DuckDB type)
-├── tests/                         # 30 unit tests
+├── pipelines/                     # one subdir per pipeline (= one job = one output file)
+│   ├── gdp_jpn/
+│   │   ├── manifest.yaml          #   job definition + output_root
+│   │   ├── queries/timeseries.sql #   SQL template
+│   │   └── schemas/timeseries.yaml#   column definitions (name + DuckDB type)
+│   └── population_latam/
+│       ├── manifest.yaml
+│       ├── queries/timeseries.sql
+│       └── schemas/timeseries.yaml
+├── tests/                         # 37 unit tests
 ├── archive/
 │   └── api_bulk_downloader_v1/    # v1 reference (ZIP/stream approach)
 └── pyproject.toml
@@ -55,16 +57,18 @@ This installs the `wdi-pipeline` command and all dependencies
 Set defaults in `.env` (optional):
 
 ```dotenv
-WDI_MANIFEST=pipelines/worldbank/manifest.yaml
-WDI_OUTPUT_ROOT=outputs/
+WDI_MANIFEST=pipelines/gdp_jpn/manifest.yaml   # for `run`
+WDI_PIPELINE_DIR=pipelines/                     # for `run-all`
 ```
+
+### `run` — single pipeline
 
 ```bash
 # Run with .env defaults (no flags needed)
 wdi-pipeline run
 
 # Override manifest or output root at runtime
-wdi-pipeline run --manifest pipelines/other/manifest.yaml
+wdi-pipeline run --manifest pipelines/gdp_jpn/manifest.yaml
 wdi-pipeline run --output-root tmp/
 
 # Validate manifest structure — no network calls
@@ -73,19 +77,40 @@ wdi-pipeline run --dry-run
 # Discover column schema only — no data fetched
 wdi-pipeline run --probe
 
-# Run a single job
+# Run a single named job
 wdi-pipeline run --only gdp_jpn
 
 # Verbose logging
 wdi-pipeline run --log-level DEBUG
 ```
 
+### `run-all` — all pipelines under a directory
+
+```bash
+# Run every pipeline found under pipelines/
+wdi-pipeline run-all --pipeline-dir pipelines/
+
+# Dry-run all pipelines (uses WDI_PIPELINE_DIR from .env)
+wdi-pipeline run-all --dry-run
+
+# Override output root for all pipelines (flat, no subdirs)
+wdi-pipeline run-all --pipeline-dir pipelines/ --output-root tmp/
+
+# Skip the preflight path-collision check
+wdi-pipeline run-all --pipeline-dir pipelines/ --allow-overwrite
+```
+
+`run-all` performs a preflight check before executing: if two pipelines would write to
+the same path (same `export.filename` or same `job.name`), it exits with an error.
+Use `--allow-overwrite` to disable the check (last write wins).
+
 Resolution order:
 
 | Setting | Priority 1 | Priority 2 | Priority 3 |
 |---|---|---|---|
 | manifest path | `--manifest` | `WDI_MANIFEST` | error |
-| output root | `--output-root` | `WDI_OUTPUT_ROOT` | manifest default |
+| pipeline dir | `--pipeline-dir` | `WDI_PIPELINE_DIR` | error |
+| output root | `--output-root` | manifest `defaults.output_root` | — |
 
 | Mode | `discover()` | `materialize()` | SQL / export |
 |------|:---:|:---:|:---:|
@@ -97,12 +122,13 @@ Resolution order:
 
 ## Manifest
 
-Jobs are declared in `pipelines/worldbank/manifest.yaml`:
+Each pipeline lives in its own subdirectory and contains exactly one job.
+Example — `pipelines/gdp_jpn/manifest.yaml`:
 
 ```yaml
 defaults:
   output_root: outputs/      # base directory for all exports
-  export_format: csv         # default format (csv or parquet)
+  export_format: parquet     # default format (csv or parquet)
 
 jobs:
   - name: gdp_jpn
@@ -116,14 +142,9 @@ jobs:
       params:
         min_year: "2000"         # injected as SQL literal via {{min_year}}
     export:
-      format: parquet            # overrides default
       filename: gdp_jpn          # output: outputs/gdp_jpn.parquet
     schema:
       file: schemas/timeseries.yaml  # column definitions
-
-  - name: salesforce_opps
-    enabled: false               # skipped in all modes
-    ...
 ```
 
 `source.params` are passed as keyword arguments to the connector constructor.
@@ -164,7 +185,7 @@ SQL files under `queries/` may contain `{{key}}` placeholders:
 SELECT country_code, country_name, indicator_code, indicator_name, year, value
 FROM dataset
 WHERE year >= {{min_year}}
-ORDER BY country_code, year
+ORDER BY country_code, year;
 ```
 
 `{{key}}` is replaced with a typed SQL literal before execution:
@@ -306,7 +327,7 @@ duration, row count, export path, discovery columns, and any error message.
 pytest tests/ -v
 ```
 
-30 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
+37 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
 accepts an injected `session` argument, and tests pass a `FakeSession`
 that returns pre-defined page payloads.
 
