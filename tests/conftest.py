@@ -43,7 +43,7 @@ def tmp_manifest(tmp_path: Path):
 
         # Create the schema file referenced by jobs
         (tmp_path / "schemas").mkdir(exist_ok=True)
-        (tmp_path / "schemas" / "worldbank_timeseries.yaml").write_text(
+        (tmp_path / "schemas" / "timeseries.yaml").write_text(
             "columns:\n"
             "  - {name: country_code, type: VARCHAR}\n"
             "  - {name: country_name, type: VARCHAR}\n"

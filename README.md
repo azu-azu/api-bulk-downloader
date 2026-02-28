@@ -30,7 +30,7 @@ api-bulk-downloader/
 │       ├── queries/
 │       │   └── timeseries.sql     #     SQL template
 │       └── schemas/
-│           └── worldbank_timeseries.yaml  # column definitions (name + DuckDB type)
+│           └── timeseries.yaml  # column definitions (name + DuckDB type)
 ├── tests/                         # 30 unit tests
 ├── archive/
 │   └── api_bulk_downloader_v1/    # v1 reference (ZIP/stream approach)
@@ -101,7 +101,7 @@ jobs:
       format: parquet            # overrides default
       filename: gdp_jpn          # output: outputs/gdp_jpn.parquet
     schema:
-      file: schemas/worldbank_timeseries.yaml  # column definitions
+      file: schemas/timeseries.yaml  # column definitions
 
   - name: salesforce_opps
     enabled: false               # skipped in all modes
@@ -119,7 +119,7 @@ jobs:
 Column definitions are declared in separate YAML files under `schemas/`:
 
 ```yaml
-# schemas/worldbank_timeseries.yaml
+# schemas/timeseries.yaml
 columns:
   - name: country_code
     type: VARCHAR
@@ -171,10 +171,10 @@ flowchart LR
     MAN["Config Load<br>-----<br><br><u><b>manifest.py</b></u><br>load_manifest()<br>job.schema を作る"]
 
     %% inputs (auxiliary)
-    subgraph PRE ["事前設定"]
-        MF[/"<u><b>pipelines/default/manifest.yaml</b></u><br>job定義"/]
-        SCH[/"<u><b>schemas/*.yaml</b></u><br>列定義 (name · type)"/]
-        SQL_FILE[/"<u><b>queries/**/*.sql</b></u><br>SQL テンプレ"/]
+    subgraph PRE ["<u><b>pipelines/*/</b></u><br>（事前設定）"]
+        MF[/"<u><b>manifest.yaml</b></u><br>job定義"/]
+        SCH[/"<u><b>schemas/timeseries.yaml</b></u><br>列定義 (name · type)"/]
+        SQL_FILE[/"<u><b>queries/timeseries.sql</b></u><br>SQL テンプレ"/]
     end
 
     SKIP(["⏭ skipped"])
