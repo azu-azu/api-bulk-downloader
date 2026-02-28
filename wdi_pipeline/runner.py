@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +67,7 @@ def _run_job(
     probe: bool,
 ) -> JobSummary:
     summary = make_summary(job.name)
+    t0 = time.monotonic()
     logger.info("=== Job: %s ===", job.name)
 
     if dry_run:
@@ -78,8 +80,9 @@ def _run_job(
 
     try:
         # discover() is always called (no network required for worldbank)
+        logger.info("  discover …")
         discovery = connector.discover(job)
-        logger.info("discover: columns=%s", discovery.columns)
+        logger.info("  discover done: %d columns", len(discovery.columns))
 
         if probe:
             logger.info("[probe] Job '%s' — discover complete, skipping materialize.", job.name)
@@ -90,7 +93,9 @@ def _run_job(
         # Full execution
         conn = duckdb.connect()
         try:
+            logger.info("  materialize …")
             connector.materialize(job, conn)
+            logger.info("  materialize done")
 
             sql_text = job.sql.file.read_text()
             rendered_sql, values = render(sql_text, job.sql.params)
@@ -98,17 +103,19 @@ def _run_job(
             ext = "csv" if job.export.format == "csv" else "parquet"
             dest = (output_root / f"{job.export.filename}.{ext}").resolve()
 
+            logger.info("  export …")
             rows = export(conn, rendered_sql, values, dest, job.export.format)
         finally:
             conn.close()
 
+        elapsed = time.monotonic() - t0
         summary.status = "success"
         summary.finish(
             rows=rows,
             export_path=dest,
             discovery_columns=discovery.columns,
         )
-        logger.info("Job '%s' done — %d rows → %s", job.name, rows, dest)
+        logger.info("Job '%s' done — %d rows → %s  (%.2f s)", job.name, rows, dest, elapsed)
 
     except PipelineError as exc:
         logger.error("Job '%s' failed: %s", job.name, exc)

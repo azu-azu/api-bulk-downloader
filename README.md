@@ -128,7 +128,7 @@ Example — `pipelines/gdp_jpn/manifest.yaml`:
 ```yaml
 defaults:
   output_root: outputs/      # base directory for all exports
-  export_format: parquet     # default format (csv or parquet)
+  export_format: parquet     # default format (csv or parquet) — Excel (.xlsx) is not supported
 
 jobs:
   - name: gdp_jpn
