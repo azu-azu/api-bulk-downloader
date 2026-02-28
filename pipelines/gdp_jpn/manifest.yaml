@@ -1,18 +1,18 @@
 defaults:
   output_root: outputs/
   export_format: csv
-
 jobs:
-  - job_id: gdp_jpn
-    enabled: true
-    connector_params:
-      indicator_code: NY.GDP.MKTP.CD
-      country_code: JPN
-    sql:
-      file: queries/timeseries.sql
-      params:
-        min_year: "2000"
-    export:
-      filename: gdp_jpn
-    schema:
-      file: schemas/timeseries.yaml
+- job_id: gdp_jpn
+  enabled: false
+  connector_params:
+    indicator_code: NY.GDP.MKTP.CD
+    country_code: JPN
+  sql:
+    file: queries/timeseries.sql
+    params:
+      min_year: '2000'
+  export:
+    filename: gdp_jpn
+    format: csv
+  schema:
+    file: schemas/timeseries.yaml
