@@ -4,6 +4,7 @@ defaults:
 
 jobs:
   - job_id: population_latam
+    enabled: true
     connector_params:
       indicator_code: SP.POP.TOTL
       country_code: LCN

@@ -48,7 +48,7 @@ pip install -e .
 ```
 
 This installs the `wdi-pipeline` command and all dependencies
-(`requests`, `urllib3`, `duckdb`, `pyyaml`, `python-dotenv`).
+(`requests`, `urllib3`, `duckdb`, `pyyaml`, `python-dotenv`, `tabulate`).
 
 ---
 
@@ -104,6 +104,27 @@ wdi-pipeline run-all --pipeline-dir pipelines/ --allow-overwrite
 the same path (same `export.filename` or same `job.job_id`), it exits with an error.
 Use `--allow-overwrite` to disable the check (last write wins).
 
+### `list` — show pipeline configuration
+
+```bash
+# List all jobs under pipelines/
+wdi-pipeline list --pipeline-dir pipelines/
+
+# Uses WDI_PIPELINE_DIR from .env
+wdi-pipeline list
+```
+
+Displays a table of all jobs sorted by enabled status then `indicator_code`:
+
+```
+Enabled    indicator_code    filename              output dir    column names
+---------  ----------------  --------------------  ------------  -----------------------------------------------------------------------
+true       NY.GDP.MKTP.CD    gdp_jpn.csv           outputs       country_code, country_name, indicator_code, indicator_name, year, value
+true       SP.POP.TOTL       population_latam.csv  outputs       country_code, country_name, indicator_code, indicator_name, year, value
+```
+
+Jobs with `enabled: false` appear at the bottom of the table.
+
 Resolution order:
 
 | Setting | Priority 1 | Priority 2 | Priority 3 |
@@ -132,6 +153,7 @@ defaults:
 
 jobs:
   - job_id: gdp_jpn
+    enabled: true
     connector_params:
       indicator_code: NY.GDP.MKTP.CD
       country_code: JPN        # ISO 3166-1 alpha-3, or "all"

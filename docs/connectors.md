@@ -25,6 +25,7 @@ defaults:
 
 jobs:
   - job_id: gdp_jpn
+    enabled: true
     connector_params:
       indicator_code: NY.GDP.MKTP.CD
       country_code: JPN
@@ -87,6 +88,7 @@ defaults:
 
 jobs:
   - job_id: sf_accounts
+    enabled: true
     connector_params:
       object_name: Account          # 取得対象の SObject 名
     sql:

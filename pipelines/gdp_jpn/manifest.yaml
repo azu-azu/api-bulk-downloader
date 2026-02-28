@@ -4,6 +4,7 @@ defaults:
 
 jobs:
   - job_id: gdp_jpn
+    enabled: true
     connector_params:
       indicator_code: NY.GDP.MKTP.CD
       country_code: JPN
