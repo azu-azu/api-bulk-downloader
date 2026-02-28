@@ -1,0 +1,43 @@
+defaults:
+  output_root: outputs/
+  export_format: csv
+
+jobs:
+  - name: gdp_jpn
+    source:
+      type: worldbank_indicator
+      params:
+        indicator_code: NY.GDP.MKTP.CD
+        country_code: JPN
+    sql:
+      file: queries/worldbank/timeseries.sql
+      params:
+        min_year: "2000"
+    export:
+      format: parquet
+      filename: gdp_jpn
+
+  - name: population_latam
+    source:
+      type: worldbank_indicator
+      params:
+        indicator_code: SP.POP.TOTL
+        country_code: LCN
+    sql:
+      file: queries/worldbank/timeseries.sql
+      params:
+        min_year: "2000"
+    export:
+      filename: population_latam
+
+  - name: salesforce_opps
+    enabled: false
+    source:
+      type: salesforce_report
+      params:
+        report_id: "00O000000000001"
+    sql:
+      file: queries/salesforce/report_default.sql
+      params: {}
+    export:
+      filename: sf_opps
