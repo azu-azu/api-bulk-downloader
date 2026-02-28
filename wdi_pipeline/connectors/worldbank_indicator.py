@@ -9,17 +9,10 @@ from urllib3.util.retry import Retry
 
 from wdi_pipeline.connectors.protocol import DiscoveryResult
 from wdi_pipeline.exceptions import ConnectorError
+from wdi_pipeline.manifest import JobConfig
 
 logger = logging.getLogger(__name__)
 
-_COLUMNS = [
-    "country_code",
-    "country_name",
-    "indicator_code",
-    "indicator_name",
-    "year",
-    "value",
-]
 _BASE_URL = "https://api.worldbank.org/v2"
 
 
@@ -48,25 +41,18 @@ class WorldBankIndicatorConnector:
     # Protocol interface
     # ------------------------------------------------------------------
 
-    def discover(self, job: object) -> DiscoveryResult:
-        """Return fixed schema — no network call required."""
-        return DiscoveryResult(columns=_COLUMNS)
+    def discover(self, job: JobConfig) -> DiscoveryResult:
+        """Return schema columns from job config — no network call required."""
+        return DiscoveryResult(columns=[c.name for c in job.schema.columns])
 
-    def materialize(self, job: object, conn: Any) -> None:  # duckdb.DuckDBPyConnection
+    def materialize(self, job: JobConfig, conn: Any) -> None:  # duckdb.DuckDBPyConnection
         """Stream-insert all pages into a DuckDB TABLE named 'dataset'."""
+        cols_ddl = ", ".join(f"{c.name} {c.type}" for c in job.schema.columns)
         conn.execute("DROP TABLE IF EXISTS dataset")
-        conn.execute(
-            """
-            CREATE TABLE dataset (
-                country_code    VARCHAR,
-                country_name    VARCHAR,
-                indicator_code  VARCHAR,
-                indicator_name  VARCHAR,
-                year            INTEGER,
-                value           DOUBLE
-            )
-            """
-        )
+        conn.execute(f"CREATE TABLE dataset ({cols_ddl})")
+
+        placeholders = ", ".join(["?"] * len(job.schema.columns))
+        insert_sql = f"INSERT INTO dataset VALUES ({placeholders})"
 
         page = 1
         total_rows = 0
@@ -76,9 +62,7 @@ class WorldBankIndicatorConnector:
                 logger.debug("Page %d returned empty data — stopping.", page)
                 break
             rows = self._normalize(data)
-            conn.executemany(
-                "INSERT INTO dataset VALUES (?, ?, ?, ?, ?, ?)", rows
-            )
+            conn.executemany(insert_sql, rows)
             total_rows += len(rows)
             pages = int(meta.get("pages", 1))
             logger.debug("Page %d/%d — %d rows inserted.", page, pages, len(rows))

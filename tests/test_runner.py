@@ -56,6 +56,8 @@ def test_dry_run_no_network_calls(tmp_manifest, tmp_path):
         "        min_year: \"2000\"\n"
         "    export:\n"
         "      filename: gdp_jpn\n"
+        "    schema:\n"
+        "      file: schemas/worldbank_timeseries.yaml\n"
     )
     cfg = load_manifest(path, base_dir=path.parent)
     cfg.output_root = tmp_path / "outputs"
@@ -87,6 +89,8 @@ def test_probe_calls_discover_not_materialize(tmp_manifest, tmp_path):
         "        min_year: \"2000\"\n"
         "    export:\n"
         "      filename: gdp_jpn\n"
+        "    schema:\n"
+        "      file: schemas/worldbank_timeseries.yaml\n"
     )
     cfg = load_manifest(path, base_dir=path.parent)
     cfg.output_root = tmp_path / "outputs"
@@ -116,6 +120,8 @@ def test_failed_job_does_not_stop_subsequent_jobs(tmp_manifest, tmp_path):
         "        min_year: \"2000\"\n"
         "    export:\n"
         "      filename: job_fail\n"
+        "    schema:\n"
+        "      file: schemas/worldbank_timeseries.yaml\n"
         "  - name: job_ok\n"
         "    source:\n"
         "      type: worldbank_indicator\n"
@@ -128,6 +134,8 @@ def test_failed_job_does_not_stop_subsequent_jobs(tmp_manifest, tmp_path):
         "        min_year: \"2000\"\n"
         "    export:\n"
         "      filename: job_ok\n"
+        "    schema:\n"
+        "      file: schemas/worldbank_timeseries.yaml\n"
     )
     path = tmp_manifest(yaml_jobs)
     cfg = load_manifest(path, base_dir=path.parent)
@@ -179,6 +187,8 @@ def test_only_flag_filters_jobs(tmp_manifest, tmp_path):
         "        min_year: \"2000\"\n"
         "    export:\n"
         "      filename: job_a\n"
+        "    schema:\n"
+        "      file: schemas/worldbank_timeseries.yaml\n"
         "  - name: job_b\n"
         "    source:\n"
         "      type: worldbank_indicator\n"
@@ -191,6 +201,8 @@ def test_only_flag_filters_jobs(tmp_manifest, tmp_path):
         "        min_year: \"2000\"\n"
         "    export:\n"
         "      filename: job_b\n"
+        "    schema:\n"
+        "      file: schemas/worldbank_timeseries.yaml\n"
     )
     path = tmp_manifest(yaml_jobs)
     cfg = load_manifest(path, base_dir=path.parent)
