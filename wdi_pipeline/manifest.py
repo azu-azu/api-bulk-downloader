@@ -16,6 +16,17 @@ _KNOWN_FORMATS = {"csv", "parquet"}
 
 
 @dataclass
+class ColumnDef:
+    name: str
+    type: str  # DuckDB type string (VARCHAR, INTEGER, DOUBLE, ...)
+
+
+@dataclass
+class SchemaConfig:
+    columns: list[ColumnDef]
+
+
+@dataclass
 class ExportConfig:
     filename: str
     format: str = "csv"
@@ -39,6 +50,7 @@ class JobConfig:
     source: SourceConfig
     sql: SqlConfig
     export: ExportConfig
+    schema: SchemaConfig
     enabled: bool = True
 
 
@@ -148,10 +160,38 @@ def _parse_job(
     filename = raw_export.get("filename") or name
     export_cfg = ExportConfig(filename=filename, format=fmt)
 
+    # schema
+    raw_schema = raw.get("schema")
+    if not isinstance(raw_schema, dict):
+        raise ManifestValidationError(f"Job '{name}': 'schema' must be a mapping.")
+    schema_file_rel = raw_schema.get("file")
+    if not schema_file_rel:
+        raise ManifestValidationError(f"Job '{name}': 'schema.file' is required.")
+    schema_file = (base_dir / schema_file_rel).resolve()
+    if not schema_file.exists():
+        raise ManifestValidationError(
+            f"Job '{name}': schema file not found: {schema_file}"
+        )
+    with schema_file.open() as fh:
+        raw_schema_data = yaml.safe_load(fh)
+    if not isinstance(raw_schema_data, dict) or "columns" not in raw_schema_data:
+        raise ManifestValidationError(
+            f"Job '{name}': schema file must contain a 'columns' list."
+        )
+    columns: list[ColumnDef] = []
+    for col_entry in raw_schema_data["columns"]:
+        if not isinstance(col_entry, dict) or "name" not in col_entry or "type" not in col_entry:
+            raise ManifestValidationError(
+                f"Job '{name}': each schema column must have 'name' and 'type'."
+            )
+        columns.append(ColumnDef(name=col_entry["name"], type=col_entry["type"]))
+    schema_cfg = SchemaConfig(columns=columns)
+
     return JobConfig(
         name=name,
         source=source,
         sql=sql_cfg,
         export=export_cfg,
+        schema=schema_cfg,
         enabled=enabled,
     )

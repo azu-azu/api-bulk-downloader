@@ -1,0 +1,14 @@
+# schemas/worldbank_timeseries.yaml
+columns:
+  - name: country_code
+    type: VARCHAR
+  - name: country_name
+    type: VARCHAR
+  - name: indicator_code
+    type: VARCHAR
+  - name: indicator_name
+    type: VARCHAR
+  - name: year
+    type: INTEGER
+  - name: value
+    type: DOUBLE
