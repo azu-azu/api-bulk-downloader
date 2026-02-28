@@ -6,13 +6,12 @@ from typing import Any
 
 import duckdb
 
-from src.connectors.protocol import ConnectorProtocol
-from src.connectors.worldbank_indicator import WorldBankIndicatorConnector
-from src.exceptions import PipelineError
-from src.exporter import export
-from src.manifest import JobConfig, ManifestConfig
-from src.sql_template import render
-from src.summary import JobSummary, make_summary
+from wdi_pipeline.connectors.worldbank_indicator import WorldBankIndicatorConnector
+from wdi_pipeline.exceptions import PipelineError
+from wdi_pipeline.exporter import export
+from wdi_pipeline.manifest import JobConfig, ManifestConfig
+from wdi_pipeline.sql_template import render
+from wdi_pipeline.summary import JobSummary, make_summary
 
 logger = logging.getLogger(__name__)
 

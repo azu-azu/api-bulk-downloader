@@ -2,8 +2,8 @@
 import pytest
 from pathlib import Path
 
-from src.manifest import load_manifest
-from src.exceptions import ManifestValidationError
+from wdi_pipeline.manifest import load_manifest
+from wdi_pipeline.exceptions import ManifestValidationError
 
 
 def _wb_job(name: str, min_year: str = "2000") -> str:

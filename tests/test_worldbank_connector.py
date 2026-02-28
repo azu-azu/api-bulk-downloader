@@ -5,8 +5,8 @@ import duckdb
 import pytest
 
 from tests.conftest import FakeSession
-from src.connectors.worldbank_indicator import WorldBankIndicatorConnector
-from src.exceptions import ConnectorError
+from wdi_pipeline.connectors.worldbank_indicator import WorldBankIndicatorConnector
+from wdi_pipeline.exceptions import ConnectorError
 
 
 # ---------------------------------------------------------------------------

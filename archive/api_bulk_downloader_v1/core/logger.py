@@ -24,10 +24,9 @@ class DownloadMetrics:
     start_time: float = field(default_factory=time.time)
     end_time: Optional[float] = None
     bytes_downloaded: int = 0
-    row_count: Optional[int] = None  # CSVファイルの場合のみ設定される
+    row_count: Optional[int] = None
 
     def finish(self) -> None:
-        """ダウンロード完了を記録し、終了時刻を保存する。"""
         self.end_time = time.time()
 
     @property
@@ -37,10 +36,8 @@ class DownloadMetrics:
         return round(self.end_time - self.start_time, 3)
 
     def log(self, logger: logging.Logger) -> None:
-        """計測サマリーをロガーに出力する。"""
         logger.info(
-            "Download complete | "
-            "start=%.3f end=%.3f duration=%ss bytes=%d rows=%s",
+            "Download complete | start=%.3f end=%.3f duration=%ss bytes=%d rows=%s",
             self.start_time,
             self.end_time,
             self.duration_seconds,

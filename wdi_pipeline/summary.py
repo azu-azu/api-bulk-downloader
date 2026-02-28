@@ -5,7 +5,6 @@ import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -14,21 +13,21 @@ logger = logging.getLogger(__name__)
 class JobSummary:
     job_name: str
     status: str  # "success" | "skipped" | "probed" | "failed"
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
-    duration_seconds: Optional[float] = None
-    rows_exported: Optional[int] = None
-    export_path: Optional[str] = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    duration_seconds: float | None = None
+    rows_exported: int | None = None
+    export_path: str | None = None
     discovery_columns: list[str] = field(default_factory=list)
-    error: Optional[str] = None
+    error: str | None = None
 
     def finish(
         self,
         *,
-        rows: Optional[int] = None,
-        export_path: Optional[Path] = None,
-        discovery_columns: Optional[list[str]] = None,
-        error: Optional[str] = None,
+        rows: int | None = None,
+        export_path: Path | None = None,
+        discovery_columns: list[str] | None = None,
+        error: str | None = None,
     ) -> None:
         self.finished_at = _now_iso()
         if self.started_at:

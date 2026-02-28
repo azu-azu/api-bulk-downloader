@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from src.exceptions import ExportError
+from wdi_pipeline.exceptions import ExportError
 
 logger = logging.getLogger(__name__)
 

@@ -2,16 +2,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import patch
 
-import duckdb
 import pytest
 
 from tests.conftest import FakeSession
-from src.connectors.worldbank_indicator import WorldBankIndicatorConnector
-from src.manifest import load_manifest
-from src.runner import run_pipeline
-from src.exceptions import PipelineError
+from wdi_pipeline.connectors.worldbank_indicator import WorldBankIndicatorConnector
+from wdi_pipeline.manifest import load_manifest
+from wdi_pipeline.runner import run_pipeline
+from wdi_pipeline.exceptions import PipelineError
 
 
 # ---------------------------------------------------------------------------

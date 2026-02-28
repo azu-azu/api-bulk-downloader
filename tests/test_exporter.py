@@ -3,8 +3,8 @@ import duckdb
 import pytest
 from pathlib import Path
 
-from src.exporter import export
-from src.exceptions import ExportError
+from wdi_pipeline.exporter import export
+from wdi_pipeline.exceptions import ExportError
 
 
 def _conn_with_dataset(rows: list[tuple]) -> duckdb.DuckDBPyConnection:
@@ -56,7 +56,7 @@ def test_unsupported_format_raises(tmp_path: Path):
 
 def test_export_with_rendered_literal_filter(tmp_path: Path):
     """render() embeds literals directly — exporter receives no bind params."""
-    from src.sql_template import render
+    from wdi_pipeline.sql_template import render
     conn = _conn_with_dataset([("JPN", 2020, 1.0), ("USA", 2021, 2.0)])
     dest = tmp_path / "out.csv"
     sql, values = render(

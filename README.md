@@ -1,157 +1,213 @@
-# API Bulk Downloader
+# wdi-pipeline
 
-A production-style Python prototype for safely downloading large datasets via API.
+Manifest-driven batch pipeline that fetches World Development Indicators (WDI)
+from the World Bank API, filters them with SQL, and exports to CSV or Parquet.
 
-## Project Structure
+Built as a production-style Python prototype — connector-agnostic core, DuckDB
+for in-process SQL, streaming page ingestion, and no pandas dependency.
+
+---
+
+## Repository layout
 
 ```
-api_bulk_downloader/
-├── core/
-│   ├── config.py       # Persistent output-dir config (load/save ~/.config/.../config.json)
-│   ├── downloader.py   # Streaming downloader with retry/backoff (connector-agnostic)
-│   ├── file_utils.py   # Chunk writes, ZIP extraction, primary CSV selection, row counting
-│   └── logger.py       # Logging setup and DownloadMetrics dataclass
-├── connectors/
-│   └── worldbank.py    # World Bank Indicators API connector
-├── main.py             # CLI entry point
-tests/
-└── test_file_utils.py  # Unit tests for file_utils (choose_primary_csv)
+api-bulk-downloader/
+├── wdi_pipeline/                  # installable package (v2)
+│   ├── cli.py                     #   argparse entry point
+│   ├── runner.py                  #   job loop (dry-run / probe / full)
+│   ├── manifest.py                #   YAML loader + validation
+│   ├── sql_template.py            #   {{key}} → SQL literal renderer
+│   ├── exporter.py                #   DuckDB COPY → CSV / Parquet
+│   ├── summary.py                 #   per-job JSON summary
+│   ├── logging_setup.py
+│   ├── exceptions.py
+│   └── connectors/
+│       ├── protocol.py            #   ConnectorProtocol, DiscoveryResult
+│       └── worldbank_indicator.py #   JSON paging + Session DI
+├── queries/
+│   └── worldbank/
+│       └── timeseries.sql         # default SQL template
+├── configs/
+│   └── manifest.yaml              # job definitions
+├── tests/                         # 30 unit tests
+├── archive/
+│   └── api_bulk_downloader_v1/    # v1 reference (ZIP/stream approach)
+└── pyproject.toml
 ```
 
-## Quick Start
+---
+
+## Installation
 
 ```bash
-pip install -r requirements.txt
-
-# Download World Bank GDP data (default, saves to ./downloads)
-python -m api_bulk_downloader.main
-
-# Persist an output directory (written to ~/.config/api_bulk_downloader/config.json)
-python -m api_bulk_downloader.main --set-dest /data/worldbank
-
-# Specify a different indicator and output directory
-python -m api_bulk_downloader.main --indicator SP.POP.TOTL --dest data/
-
-# Full options
-python -m api_bulk_downloader.main --help
+pip install -e .
 ```
+
+This installs the `wdi-pipeline` command and all dependencies
+(`requests`, `urllib3`, `duckdb`, `pyyaml`, `python-dotenv`).
+
+---
+
+## Usage
+
+```bash
+# Validate manifest structure — no network calls
+wdi-pipeline run --manifest configs/manifest.yaml --dry-run
+
+# Discover column schema only — no data fetched
+wdi-pipeline run --manifest configs/manifest.yaml --probe
+
+# Run all enabled jobs
+wdi-pipeline run --manifest configs/manifest.yaml
+
+# Run a single job
+wdi-pipeline run --manifest configs/manifest.yaml --only gdp_jpn
+
+# Verbose logging
+wdi-pipeline run --manifest configs/manifest.yaml --log-level DEBUG
+```
+
+| Mode | `discover()` | `materialize()` | SQL / export |
+|------|:---:|:---:|:---:|
+| normal | ✅ | ✅ | ✅ |
+| `--dry-run` | — | — | — |
+| `--probe` | ✅ | — | — |
+
+---
+
+## Manifest
+
+Jobs are declared in `configs/manifest.yaml`:
+
+```yaml
+defaults:
+  output_root: outputs/      # base directory for all exports
+  export_format: csv         # default format (csv or parquet)
+
+jobs:
+  - name: gdp_jpn
+    source:
+      type: worldbank_indicator
+      params:
+        indicator_code: NY.GDP.MKTP.CD
+        country_code: JPN        # ISO 3166-1 alpha-3, or "all"
+    sql:
+      file: queries/worldbank/timeseries.sql
+      params:
+        min_year: "2000"         # injected as SQL literal via {{min_year}}
+    export:
+      format: parquet            # overrides default
+      filename: gdp_jpn          # output: outputs/gdp_jpn.parquet
+
+  - name: salesforce_opps
+    enabled: false               # skipped in all modes
+    ...
+```
+
+`source.params` are passed as keyword arguments to the connector constructor.
+`sql.params` replace `{{key}}` placeholders in the SQL file.
+
+---
+
+## SQL templates
+
+SQL files under `queries/` may contain `{{key}}` placeholders:
+
+```sql
+SELECT country_code, country_name, indicator_code, indicator_name, year, value
+FROM dataset
+WHERE year >= {{min_year}}
+ORDER BY country_code, year
+```
+
+`{{key}}` is replaced with a typed SQL literal before execution:
+integers and floats are embedded bare; other strings are single-quoted
+with `'` escaped. Parameters come from `sql.params` in the manifest
+(operator-controlled config, not user input).
+
+The materialized API data is always available as a DuckDB table named `dataset`.
+
+---
 
 ## Architecture
 
-### Separation of Concerns
+### Data flow per job
 
-| Layer | Responsibility |
-|-------|---------------|
-| `core/config.py` | Persist and load output directory (`~/.config/.../config.json`) |
-| `core/downloader.py` | HTTP streaming, retry logic, orchestration — no API knowledge |
-| `core/file_utils.py` | File I/O: chunked writes, ZIP extraction, primary CSV selection, row counting |
-| `core/logger.py` | Logging config, `DownloadMetrics` (start/end/duration/bytes/rows) |
-| `connectors/*` | API-specific URL building and authentication headers |
+```
+manifest.yaml
+     │
+     ▼
+ connector.discover()     → DiscoveryResult (fixed schema, no network)
+     │
+     ▼
+ connector.materialize()  → streams pages into DuckDB TABLE "dataset"
+     │
+     ▼
+ sql_template.render()    → resolves {{key}} → SQL literal
+     │
+     ▼
+ exporter.export()        → CREATE TEMP VIEW → COPY TO file (CSV/Parquet)
+     │
+     ▼
+ summary.write()          → {job_name}_summary.json
+```
 
-### Connector Protocol
-
-Each connector exposes only two properties:
+### Connector protocol
 
 ```python
-@property
-def download_url(self) -> str: ...      # full URL to the resource
-@property
-def request_headers(self) -> dict: ...  # HTTP headers (auth, Accept, etc.)
+class ConnectorProtocol(Protocol):
+    def discover(self, job) -> DiscoveryResult: ...
+    def materialize(self, job, conn: duckdb.DuckDBPyConnection) -> None: ...
 ```
 
-`BulkDownloader` depends on this protocol, not on concrete connector classes,
-making it trivial to swap in the Salesforce connector later without touching
-any core code.
+`runner.py` calls both methods for every enabled job.
+`discover()` is always a no-network call (returns a fixed schema).
+`materialize()` streams API pages directly into a per-job DuckDB connection —
+no full dataset is held in memory.
 
-### Retry Strategy
+### Per-job isolation
 
-`BulkDownloader` uses `urllib3.Retry` with exponential backoff:
+Each job gets a fresh `duckdb.connect()` that is closed after export.
+Failure in one job logs an error and continues to the next.
+
+### Retry
+
+`WorldBankIndicatorConnector` uses `urllib3.Retry` with
+`backoff_factor=1.0` on HTTP 429, 500, 502, 503, 504 (up to 3 attempts).
+
+---
+
+## Output
+
+After a successful run, `outputs/` contains:
 
 ```
-wait = backoff_factor × 2^(attempt − 1)
+outputs/
+├── gdp_jpn.parquet
+├── gdp_jpn_summary.json
+├── population_latam.csv
+└── population_latam_summary.json
 ```
 
-Retries on HTTP 429, 500, 502, 503, 504.
+Each `_summary.json` records job name, status, start/end time,
+duration, row count, export path, discovery columns, and any error message.
 
-### Metrics Logged
+---
 
-| Field | Description |
-|-------|-------------|
-| `start_time` | Unix timestamp when download began |
-| `end_time` | Unix timestamp when download finished |
-| `duration_seconds` | Wall-clock duration |
-| `bytes_downloaded` | Raw bytes written to disk |
-| `row_count` | CSV data rows (header excluded); `n/a` for non-CSV |
+## Testing
 
-### Data Flow
-
-```mermaid
-flowchart TD
-    CLI["main.py\n(argparse)"]
-
-    subgraph 設定解決
-        CFG_FILE["~/.config/.../config.json"]
-        CFG["core/config.py\nload_dest / save_dest"]
-    end
-
-    subgraph Connector
-        WBC["WorldBankConnector\n(単一指標)"]
-        WDIC["WorldBankWDIConnector\n(WDI全量)"]
-    end
-
-    subgraph Core
-        DL["BulkDownloader\n(downloader.py)"]
-        SESSION["requests.Session\n+ urllib3.Retry\n(429/5xx リトライ)"]
-    end
-
-    subgraph ファイル操作
-        STREAM["stream_to_file()\n8KB チャンク書き込み"]
-        ISZIP{is_zip?}
-        UNZIP["extract_zip()"]
-        SELECT["choose_primary_csv()"]
-        COUNT["count_csv_rows()"]
-    end
-
-    subgraph 出力 dest_dir
-        ZIP["*.zip (optional)"]
-        CSVS["*.csv (0..n)"]
-    end
-
-    METRICS["DownloadMetrics\n(bytes / rows / duration)"]
-    REMOTE["Remote API\n(HTTPS)"]
-
-    CLI -->|"--set-dest"| CFG
-    CFG <-->|読み書き| CFG_FILE
-    CFG -->|"load_dest()"| CLI
-
-    CLI -->|"dest_dir\nconnector\nchunk_size\nmax_retries"| DL
-
-    CLI --> WBC
-    CLI --> WDIC
-    WBC -->|"download_url\nrequest_headers"| DL
-    WDIC -->|"download_url\nrequest_headers"| DL
-
-    DL --> SESSION
-    SESSION -->|"GET stream=True"| REMOTE
-    REMOTE -->|"chunked response"| SESSION
-    SESSION --> STREAM
-    STREAM -->|"bytes_downloaded"| DL
-    STREAM --> ISZIP
-
-    ISZIP -->|Yes| ZIP
-    ZIP --> UNZIP
-    UNZIP --> CSVS
-    ISZIP -->|No| CSVS
-
-    CSVS -->|"count_rows?"| SELECT
-    SELECT --> COUNT
-    COUNT -->|"row_count"| DL
-
-    DL --> METRICS
-    METRICS -->|"log.info"| CLI
-
-    style CFG_FILE fill:#f5f0e8,stroke:#b8a070
-    style REMOTE fill:#e8f0fe,stroke:#4a7fcb
-    style METRICS fill:#e8f5e9,stroke:#4caf50
-    style ISZIP fill:#fff8e1,stroke:#f9a825
+```bash
+pytest tests/ -v
 ```
+
+30 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
+accepts an injected `session` argument, and tests pass a `FakeSession`
+that returns pre-defined page payloads.
+
+---
+
+## Archive
+
+`archive/api_bulk_downloader_v1/` is the original v1 implementation:
+a streaming HTTP downloader that fetched ZIP archives and counted CSV rows.
+It is kept for reference only and is not installed by `pyproject.toml`.

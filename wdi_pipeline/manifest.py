@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from src.exceptions import ManifestValidationError
+from wdi_pipeline.exceptions import ManifestValidationError
 
 logger = logging.getLogger(__name__)
 

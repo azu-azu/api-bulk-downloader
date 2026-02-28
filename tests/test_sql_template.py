@@ -1,8 +1,8 @@
 """Tests for src/sql_template.py"""
 import pytest
 
-from src.sql_template import render
-from src.exceptions import SQLTemplateError
+from wdi_pipeline.sql_template import render
+from wdi_pipeline.exceptions import SQLTemplateError
 
 
 def test_single_placeholder_integer():
