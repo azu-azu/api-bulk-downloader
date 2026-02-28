@@ -65,7 +65,7 @@ class WorldBankIndicatorConnector:
             conn.executemany(insert_sql, rows)
             total_rows += len(rows)
             pages = int(meta.get("pages", 1))
-            logger.debug("Page %d/%d — %d rows inserted.", page, pages, len(rows))
+            logger.info("  page %d/%d — %d rows", page, pages, len(rows))
             if page >= pages:
                 break
             page += 1

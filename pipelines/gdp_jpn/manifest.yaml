@@ -1,6 +1,6 @@
 defaults:
   output_root: outputs/
-  export_format: parquet
+  export_format: csv
 
 jobs:
   - name: gdp_jpn
