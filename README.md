@@ -55,7 +55,7 @@ This installs the `wdi-pipeline` command and all dependencies
 Set defaults in `.env` (optional):
 
 ```dotenv
-WDI_MANIFEST=pipelines/default/manifest.yaml
+WDI_MANIFEST=pipelines/worldbank/manifest.yaml
 WDI_OUTPUT_ROOT=outputs/
 ```
 
@@ -97,7 +97,7 @@ Resolution order:
 
 ## Manifest
 
-Jobs are declared in `pipelines/default/manifest.yaml`:
+Jobs are declared in `pipelines/worldbank/manifest.yaml`:
 
 ```yaml
 defaults:
