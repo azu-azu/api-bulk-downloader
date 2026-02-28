@@ -49,7 +49,7 @@ pip install -e .
 ```
 
 This installs the `wdi-pipeline` command and all dependencies
-(`requests`, `urllib3`, `duckdb`, `pyyaml`, `python-dotenv`, `tabulate`, `textual`).
+(`requests`, `urllib3`, `duckdb`, `pyyaml`, `python-dotenv`, `textual`).
 
 ---
 
