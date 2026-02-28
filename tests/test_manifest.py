@@ -21,7 +21,7 @@ def _wb_job(name: str, min_year: str = "2000") -> str:
         f"    export:\n"
         f"      filename: {name}\n"
         f"    schema:\n"
-        f"      file: schemas/worldbank_timeseries.yaml\n"
+        f"      file: schemas/timeseries.yaml\n"
     )
 
 
@@ -101,7 +101,7 @@ def test_enabled_false_excluded(tmp_manifest):
           "    export:\n"
           "      filename: job_b\n"
           "    schema:\n"
-          "      file: schemas/worldbank_timeseries.yaml\n"
+          "      file: schemas/timeseries.yaml\n"
     )
     path = tmp_manifest(yaml_jobs)
     cfg = load_manifest(path, base_dir=path.parent)

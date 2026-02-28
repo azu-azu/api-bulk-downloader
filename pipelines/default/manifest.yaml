@@ -17,7 +17,7 @@ jobs:
       format: parquet
       filename: gdp_jpn
     schema:
-      file: schemas/worldbank_timeseries.yaml
+      file: schemas/timeseries.yaml
 
   - name: population_latam
     source:
@@ -32,4 +32,4 @@ jobs:
     export:
       filename: population_latam
     schema:
-      file: schemas/worldbank_timeseries.yaml
+      file: schemas/timeseries.yaml
