@@ -1,4 +1,3 @@
-# schemas/worldbank_timeseries.yaml
 columns:
   - name: country_code
     type: VARCHAR

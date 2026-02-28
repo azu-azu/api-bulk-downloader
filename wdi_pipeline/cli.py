@@ -1,15 +1,25 @@
 """CLI entry point for the batch data pipeline.
 
 Usage:
-    wdi-pipeline run [--manifest PATH] [--output-root PATH] [--dry-run] [--probe] [--only JOB_NAME]
+    wdi-pipeline run     [--manifest PATH] [--output-root PATH] [--dry-run] [--probe] [--only JOB_NAME]
+    wdi-pipeline run-all [--pipeline-dir PATH] [--output-root PATH] [--dry-run] [--probe]
 
 Resolution order:
-    manifest path  : --manifest  >  WDI_MANIFEST (.env)   >  error
-    output root    : --output-root  >  WDI_OUTPUT_ROOT (.env)  >  manifest default
+    manifest path  : --manifest      >  WDI_MANIFEST (.env)      >  error
+    pipeline dir   : --pipeline-dir  >  WDI_PIPELINE_DIR (.env)  >  error
+    output root    : --output-root (CLI only)  >  manifest defaults.output_root
+
+Note: --output-root behaves identically in both `run` and `run-all`.
+It replaces manifest.output_root directly; output files are placed flat
+in the specified directory. `run-all` performs a preflight collision check
+on both export paths ({filename}.{ext}) and summary paths ({job_name}_summary.json),
+and exits with an error if any two pipelines would write to the same path.
+Use --allow-overwrite to disable the check (last write wins).
 """
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
@@ -20,6 +30,8 @@ from wdi_pipeline.logging_setup import setup_logging
 from wdi_pipeline.manifest import load_manifest
 from wdi_pipeline.runner import run_pipeline
 
+logger = logging.getLogger(__name__)
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -28,7 +40,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run_p = sub.add_parser("run", help="Execute the pipeline.")
+    # --- run ---
+    run_p = sub.add_parser("run", help="Execute a single pipeline manifest.")
     run_p.add_argument(
         "--manifest",
         default=None,
@@ -39,7 +52,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-root",
         default=None,
         metavar="PATH",
-        help="Output directory (overrides WDI_OUTPUT_ROOT env var and manifest default).",
+        help=(
+            "Override output directory (direct replacement of manifest output_root). "
+            "Output files are placed flat in PATH."
+        ),
     )
     run_p.add_argument(
         "--dry-run",
@@ -63,6 +79,48 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level (default: INFO).",
     )
+
+    # --- run-all ---
+    run_all_p = sub.add_parser("run-all", help="Execute all pipelines under a directory.")
+    run_all_p.add_argument(
+        "--pipeline-dir",
+        default=None,
+        metavar="PATH",
+        help="Directory containing pipeline subdirs (overrides WDI_PIPELINE_DIR env var).",
+    )
+    run_all_p.add_argument(
+        "--output-root",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Override output root for all pipelines (direct replacement, same as `run`). "
+            "All exports land flat in PATH. "
+            "Preflight detects path collisions and exits with an error; "
+            "use --allow-overwrite to disable. "
+            "If omitted, each manifest's own output_root is used."
+        ),
+    )
+    run_all_p.add_argument(
+        "--allow-overwrite",
+        action="store_true",
+        help="Skip preflight collision check; last write wins if filenames clash.",
+    )
+    run_all_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Skip all network calls and exports.",
+    )
+    run_all_p.add_argument(
+        "--probe",
+        action="store_true",
+        help="Run discover() only.",
+    )
+    run_all_p.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+    )
+
     return parser
 
 
@@ -87,10 +145,9 @@ def main(argv: list[str] | None = None) -> int:
         manifest_path = Path(manifest_str)
         manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
 
-        # Resolve output_root: CLI > env > manifest default
-        output_root_str = args.output_root or os.environ.get("WDI_OUTPUT_ROOT")
-        if output_root_str:
-            manifest.output_root = Path(output_root_str)
+        # Resolve output_root: CLI > manifest default
+        if args.output_root:
+            manifest.output_root = Path(args.output_root)
 
         summaries = run_pipeline(
             manifest,
@@ -101,6 +158,76 @@ def main(argv: list[str] | None = None) -> int:
         failed = [s for s in summaries if s.status == "failed"]
         if failed:
             names = ", ".join(s.job_name for s in failed)
+            print(f"\nFailed jobs: {names}", file=sys.stderr)
+            return 1
+        return 0
+
+    elif args.command == "run-all":
+        pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
+        if not pipeline_dir_str:
+            print(
+                "Error: pipeline dir is required. "
+                "Use --pipeline-dir or set WDI_PIPELINE_DIR in .env.",
+                file=sys.stderr,
+            )
+            return 1
+
+        pipeline_dir = Path(pipeline_dir_str)
+        manifests = sorted(pipeline_dir.glob("*/manifest.yaml"))
+        if not manifests:
+            print(f"No manifest.yaml found under '{pipeline_dir}'.", file=sys.stderr)
+            return 1
+
+        # Load all manifests first (needed for preflight collision check)
+        loaded = []
+        for manifest_path in manifests:
+            manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
+            if args.output_root:
+                manifest.output_root = Path(args.output_root)
+            loaded.append((manifest_path, manifest))
+
+        # Preflight collision check (skip only if --allow-overwrite)
+        # Runs even in --dry-run / --probe mode so config errors are caught early.
+        #
+        # Naming spec (confirmed from source):
+        #   export:  output_root / f"{job.export.filename}.{ext}"   (runner.py)
+        #   summary: output_root / f"{job.name}_summary.json"       (summary.py)
+        #
+        # Both paths are checked independently.
+        if not args.allow_overwrite:
+            seen: dict[str, str] = {}  # resolved dest path → "pipeline/job (export|summary)"
+            collisions: list[str] = []
+            for manifest_path, manifest in loaded:
+                for job in manifest.jobs:
+                    if not job.enabled:
+                        continue
+                    root = manifest.output_root
+                    key = f"{manifest_path.parent.name}/{job.name}"
+                    ext = "csv" if job.export.format == "csv" else "parquet"
+                    export_dest = str((root / f"{job.export.filename}.{ext}").resolve())
+                    summary_dest = str((root / f"{job.name}_summary.json").resolve())
+                    for dest, kind in ((export_dest, "export"), (summary_dest, "summary")):
+                        if dest in seen:
+                            collisions.append(
+                                f"  {dest!r}\n    <- {seen[dest]}\n    <- {key} ({kind})"
+                            )
+                        else:
+                            seen[dest] = f"{key} ({kind})"
+            if collisions:
+                print("Error: output path collisions detected:", file=sys.stderr)
+                for c in collisions:
+                    print(c, file=sys.stderr)
+                print("\nUse --allow-overwrite to disable this check.", file=sys.stderr)
+                return 1
+
+        all_failed = []
+        for manifest_path, manifest in loaded:
+            logger.info("=== Pipeline: %s ===", manifest_path.parent.name)
+            summaries = run_pipeline(manifest, dry_run=args.dry_run, probe=args.probe)
+            all_failed.extend(s for s in summaries if s.status == "failed")
+
+        if all_failed:
+            names = ", ".join(s.job_name for s in all_failed)
             print(f"\nFailed jobs: {names}", file=sys.stderr)
             return 1
         return 0
