@@ -25,11 +25,9 @@ defaults:
 
 jobs:
   - name: gdp_jpn
-    source:
-      type: worldbank_indicator
-      params:
-        indicator_code: NY.GDP.MKTP.CD
-        country_code: JPN
+    connector_params:
+      indicator_code: NY.GDP.MKTP.CD
+      country_code: JPN
     sql:
       file: queries/timeseries.sql
       params:
@@ -89,10 +87,8 @@ defaults:
 
 jobs:
   - name: sf_accounts
-    source:
-      type: salesforce
-      params:
-        object_name: Account        # 取得対象の SObject 名
+    connector_params:
+      object_name: Account          # 取得対象の SObject 名
     sql:
       file: queries/filter.sql
       params:
@@ -155,10 +151,3 @@ SF_INSTANCE_URL=https://myorg.my.salesforce.com
 | SOQL 生成例 | `SELECT Id, Name, Industry FROM Account` |
 | ページング | `simple-salesforce` の `query_all()` または Bulk API |
 
-### manifest.py への変更（実装時に必要）
-
-`_KNOWN_TYPES` に `"salesforce"` を追加します（現在は `"worldbank_indicator"` のみ）。
-
-```python
-_KNOWN_TYPES = {"worldbank_indicator", "salesforce"}
-```

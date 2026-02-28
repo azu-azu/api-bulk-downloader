@@ -4,11 +4,9 @@ defaults:
 
 jobs:
   - name: gdp_jpn
-    source:
-      type: worldbank_indicator
-      params:
-        indicator_code: NY.GDP.MKTP.CD
-        country_code: JPN
+    connector_params:
+      indicator_code: NY.GDP.MKTP.CD
+      country_code: JPN
     sql:
       file: queries/timeseries.sql
       params:

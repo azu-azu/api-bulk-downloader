@@ -4,11 +4,9 @@ defaults:
 
 jobs:
   - name: population_latam
-    source:
-      type: worldbank_indicator
-      params:
-        indicator_code: SP.POP.TOTL
-        country_code: LCN
+    connector_params:
+      indicator_code: SP.POP.TOTL
+      country_code: LCN
     sql:
       file: queries/timeseries.sql
       params:

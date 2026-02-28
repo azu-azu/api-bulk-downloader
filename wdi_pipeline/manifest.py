@@ -11,7 +11,6 @@ from wdi_pipeline.exceptions import ManifestValidationError
 
 logger = logging.getLogger(__name__)
 
-_KNOWN_TYPES = {"worldbank_indicator"}
 _KNOWN_FORMATS = {"csv", "parquet"}
 
 
@@ -39,15 +38,9 @@ class SqlConfig:
 
 
 @dataclass
-class SourceConfig:
-    type: str
-    params: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
 class JobConfig:
     name: str
-    source: SourceConfig
+    connector_params: dict[str, Any]
     sql: SqlConfig
     export: ExportConfig
     schema: SchemaConfig
@@ -120,17 +113,10 @@ def _parse_job(
 
     enabled = raw.get("enabled", True)
 
-    # source
-    raw_source = raw.get("source")
-    if not isinstance(raw_source, dict):
-        raise ManifestValidationError(f"Job '{name}': 'source' must be a mapping.")
-    src_type = raw_source.get("type")
-    if src_type not in _KNOWN_TYPES:
-        raise ManifestValidationError(
-            f"Job '{name}': unknown source type '{src_type}'. "
-            f"Known types: {sorted(_KNOWN_TYPES)}"
-        )
-    source = SourceConfig(type=src_type, params=raw_source.get("params") or {})
+    # connector_params
+    raw_connector_params = raw.get("connector_params") or {}
+    if not isinstance(raw_connector_params, dict):
+        raise ManifestValidationError(f"Job '{name}': 'connector_params' must be a mapping.")
 
     # sql
     raw_sql = raw.get("sql")
@@ -187,7 +173,7 @@ def _parse_job(
 
     return JobConfig(
         name=name,
-        source=source,
+        connector_params=raw_connector_params,
         sql=sql_cfg,
         export=export_cfg,
         schema=schema_cfg,

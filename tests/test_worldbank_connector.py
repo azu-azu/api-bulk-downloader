@@ -14,7 +14,6 @@ from wdi_pipeline.manifest import (
     ExportConfig,
     JobConfig,
     SchemaConfig,
-    SourceConfig,
     SqlConfig,
 )
 
@@ -56,7 +55,7 @@ def _make_wb_job(tmp_path: Path) -> JobConfig:
     dummy_sql.write_text("SELECT * FROM dataset")
     return JobConfig(
         name="test",
-        source=SourceConfig(type="worldbank_indicator", params={}),
+        connector_params={},
         sql=SqlConfig(file=dummy_sql, params={}),
         export=ExportConfig(filename="test", format="csv"),
         schema=schema,
