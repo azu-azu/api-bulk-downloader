@@ -24,6 +24,7 @@ import argparse
 import logging
 import os
 import sys
+import unicodedata
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -33,6 +34,43 @@ from wdi_pipeline.manifest import load_manifest
 from wdi_pipeline.runner import run_pipeline
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Table formatter (stdlib only — no tabulate dependency)
+# ---------------------------------------------------------------------------
+
+def _display_width(s: str) -> int:
+    """Return terminal display width: full-width chars count as 2, others as 1."""
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in s)
+
+
+def _pad(s: str, width: int) -> str:
+    return s + " " * max(0, width - _display_width(s))
+
+
+def _simple_table(headers: list[str], rows: list[list[str]]) -> None:
+    """Print a simple two-line-header table, handling full-width characters."""
+    n = len(headers)
+    norm: list[list[str]] = []
+    for r in rows:
+        r = list(map(str, r))
+        if len(r) < n:
+            r = r + [""] * (n - len(r))
+        elif len(r) > n:
+            r = r[:n]
+        norm.append(r)
+
+    all_rows = [list(map(str, headers))] + norm
+    widths = [max(_display_width(cell) for cell in col) for col in zip(*all_rows)]
+
+    def fmt(row: list[str]) -> str:
+        return "  ".join(_pad(c, w) for c, w in zip(row, widths))
+
+    print(fmt(all_rows[0]))
+    print("  ".join("-" * w for w in widths))
+    for row in norm:
+        print(fmt(row))
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -253,8 +291,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     elif args.command == "list":
-        from tabulate import tabulate
-
         pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
         if not pipeline_dir_str:
             print(
@@ -289,7 +325,7 @@ def main(argv: list[str] | None = None) -> int:
             for r in rows
         ]
         headers = ["Enabled", "indicator_code", "filename", "output dir", "column names"]
-        print(tabulate(table, headers=headers, tablefmt="simple"))
+        _simple_table(headers, table)
         return 0
 
     elif args.command == "gui":
