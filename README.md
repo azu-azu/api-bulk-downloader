@@ -133,23 +133,48 @@ The materialized API data is always available as a DuckDB table named `dataset`.
 
 ### Data flow per job
 
-```
-manifest.yaml
-     │
-     ▼
- connector.discover()     → DiscoveryResult (fixed schema, no network)
-     │
-     ▼
- connector.materialize()  → streams pages into DuckDB TABLE "dataset"
-     │
-     ▼
- sql_template.render()    → resolves {{key}} → SQL literal
-     │
-     ▼
- exporter.export()        → CREATE TEMP VIEW → COPY TO file (CSV/Parquet)
-     │
-     ▼
- summary.write()          → {job_name}_summary.json
+```mermaid
+flowchart LR
+    MANIFEST[/"manifest.yaml"/]
+    SQL_FILE[/"timeseries.sql"/]
+
+    MANIFEST --> CLI["cli.py\nrun_pipeline()"]
+    CLI -->|"--dry-run"| SKIP(["⏭ skipped"])
+    CLI --> CONN
+
+    subgraph CONN ["WorldBankIndicatorConnector"]
+        DISC["discover()\nfixed schema · no network"]
+        MAT["materialize()\npage loop"]
+        DISC -->|"--probe"| PROBED(["⏭ columns logged"])
+        DISC -->|full run| MAT
+    end
+
+    MAT <-->|"GET /v2/country/{cc}/indicator/{ic}?page=N\n← [{meta}, [{records}]]"| WB[/"World Bank\nIndicator API"/]
+
+    MAT -->|"INSERT rows\n(page by page)"| DS
+
+    subgraph DUCK ["DuckDB  (per-job, in-process)"]
+        DS[("TABLE dataset\ncountry_code · country_name\nindicator_code · indicator_name\nyear · value")]
+    end
+
+    SQL_FILE --> RENDER["sql_template.render()\n{{key}} → SQL literal"]
+    DS --> RENDER
+    RENDER --> EXPORT["exporter.export()\nCREATE TEMP VIEW\nCOPY TO file"]
+
+    EXPORT --> OUT_DATA[/"*.csv / *.parquet"/]
+    EXPORT --> OUT_SUM[/"*_summary.json"/]
+
+    classDef file    fill:#e8f0fe,stroke:#4a7fcb
+    classDef ext     fill:#fff3e0,stroke:#e6a817
+    classDef db      fill:#e8f5e9,stroke:#43a047
+    classDef term    fill:#f3e5f5,stroke:#8e24aa
+    classDef out     fill:#fce4ec,stroke:#e91e63
+
+    class MANIFEST,SQL_FILE file
+    class WB ext
+    class DS db
+    class SKIP,PROBED term
+    class OUT_DATA,OUT_SUM out
 ```
 
 ### Connector protocol
