@@ -179,9 +179,9 @@ flowchart LR
 
     SKIP(["⏭ skipped"])
 
-    subgraph CONN ["<u><b>connectors/worldbank_indicator.py</b></u>"]
-        DISC["Schema Discovery<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>discover()<br>job.schema から列名取得"]
-        MAT["Data Fetch<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>materialize()<br>ページループ · INSERT"]
+    subgraph CONN ["connectors/* (selected by source.type)"]
+        DISC["Schema Discovery<br>-----<br><br><u><b>connector</b></u><br>discover()<br>job.schema から列名取得"]
+        MAT["Data Fetch<br>-----<br><br><u><b>connector</b></u><br>materialize()<br>ページループ · INSERT"]
     end
 
     PROBED(["⏭ probe 完了<br>列名確認のみ"])
@@ -207,7 +207,7 @@ flowchart LR
     MAN -.->|"sql.file"| SQL_FILE
 
     RUN -->|"--dry-run"| SKIP
-    RUN --> DISC
+    RUN -->|"for each enabled job"| DISC
 
     DISC -->|"--probe"| PROBED
     DISC -->|"full run"| MAT
