@@ -12,7 +12,7 @@ Resolution order:
 Note: --output-root behaves identically in both `run` and `run-all`.
 It replaces manifest.output_root directly; output files are placed flat
 in the specified directory. `run-all` performs a preflight collision check
-on both export paths ({filename}.{ext}) and summary paths ({job_name}_summary.json),
+on both export paths ({filename}.{ext}) and summary paths ({job_id}_summary.json),
 and exits with an error if any two pipelines would write to the same path.
 Use --allow-overwrite to disable the check (last write wins).
 """
@@ -157,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         failed = [s for s in summaries if s.status == "failed"]
         if failed:
-            names = ", ".join(s.job_name for s in failed)
+            names = ", ".join(s.job_id for s in failed)
             print(f"\nFailed jobs: {names}", file=sys.stderr)
             return 1
         return 0
@@ -191,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         #
         # Naming spec (confirmed from source):
         #   export:  output_root / f"{job.export.filename}.{ext}"   (runner.py)
-        #   summary: output_root / f"{job.name}_summary.json"       (summary.py)
+        #   summary: output_root / f"{job.job_id}_summary.json"       (summary.py)
         #
         # Both paths are checked independently.
         if not args.allow_overwrite:
@@ -202,10 +202,10 @@ def main(argv: list[str] | None = None) -> int:
                     if not job.enabled:
                         continue
                     root = manifest.output_root
-                    key = f"{manifest_path.parent.name}/{job.name}"
+                    key = f"{manifest_path.parent.name}/{job.job_id}"
                     ext = "csv" if job.export.format == "csv" else "parquet"
                     export_dest = str((root / f"{job.export.filename}.{ext}").resolve())
-                    summary_dest = str((root / f"{job.name}_summary.json").resolve())
+                    summary_dest = str((root / f"{job.job_id}_summary.json").resolve())
                     for dest, kind in ((export_dest, "export"), (summary_dest, "summary")):
                         if dest in seen:
                             collisions.append(
@@ -227,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
             all_failed.extend(s for s in summaries if s.status == "failed")
 
         if all_failed:
-            names = ", ".join(s.job_name for s in all_failed)
+            names = ", ".join(s.job_id for s in all_failed)
             print(f"\nFailed jobs: {names}", file=sys.stderr)
             return 1
         return 0

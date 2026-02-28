@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class JobSummary:
-    job_name: str
+    job_id: str
     status: str  # "success" | "skipped" | "probed" | "failed"
     started_at: str | None = None
     finished_at: str | None = None
@@ -47,15 +47,15 @@ class JobSummary:
 
     def write(self, output_dir: Path) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
-        dest = output_dir / f"{self.job_name}_summary.json"
+        dest = output_dir / f"{self.job_id}_summary.json"
         with dest.open("w") as fh:
             json.dump(asdict(self), fh, indent=2)
         logger.debug("Summary written: %s", dest)
         return dest
 
 
-def make_summary(job_name: str) -> JobSummary:
-    return JobSummary(job_name=job_name, status="pending", started_at=_now_iso())
+def make_summary(job_id: str) -> JobSummary:
+    return JobSummary(job_id=job_id, status="pending", started_at=_now_iso())
 
 
 def _now_iso() -> str:

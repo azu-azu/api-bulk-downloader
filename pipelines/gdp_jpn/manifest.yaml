@@ -3,7 +3,7 @@ defaults:
   export_format: csv
 
 jobs:
-  - name: gdp_jpn
+  - job_id: gdp_jpn
     connector_params:
       indicator_code: NY.GDP.MKTP.CD
       country_code: JPN

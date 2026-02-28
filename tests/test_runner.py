@@ -44,7 +44,7 @@ def _sample_data(n: int = 3) -> list[dict]:
 def test_dry_run_no_network_calls(tmp_manifest, tmp_path):
     """dry-run must not call discover or materialize."""
     path = tmp_manifest(
-        "  - name: gdp_jpn\n"
+        "  - job_id: gdp_jpn\n"
         "    connector_params:\n"
         "      indicator_code: NY.GDP.MKTP.CD\n"
         "      country_code: JPN\n"
@@ -75,7 +75,7 @@ def test_dry_run_no_network_calls(tmp_manifest, tmp_path):
 def test_probe_calls_discover_not_materialize(tmp_manifest, tmp_path):
     """probe mode must call discover() but not materialize()."""
     path = tmp_manifest(
-        "  - name: gdp_jpn\n"
+        "  - job_id: gdp_jpn\n"
         "    connector_params:\n"
         "      indicator_code: NY.GDP.MKTP.CD\n"
         "      country_code: JPN\n"
@@ -104,7 +104,7 @@ def test_probe_calls_discover_not_materialize(tmp_manifest, tmp_path):
 def test_failed_job_does_not_stop_subsequent_jobs(tmp_manifest, tmp_path):
     """A failing job must not prevent later jobs from running."""
     yaml_jobs = (
-        "  - name: job_fail\n"
+        "  - job_id: job_fail\n"
         "    connector_params:\n"
         "      indicator_code: INVALID.CODE\n"
         "      country_code: JPN\n"
@@ -116,7 +116,7 @@ def test_failed_job_does_not_stop_subsequent_jobs(tmp_manifest, tmp_path):
         "      filename: job_fail\n"
         "    schema:\n"
         "      file: schemas/timeseries.yaml\n"
-        "  - name: job_ok\n"
+        "  - job_id: job_ok\n"
         "    connector_params:\n"
         "      indicator_code: NY.GDP.MKTP.CD\n"
         "      country_code: JPN\n"
@@ -136,7 +136,7 @@ def test_failed_job_does_not_stop_subsequent_jobs(tmp_manifest, tmp_path):
     ok_data = _sample_data(2)
 
     def _materialize_side_effect(job, conn):
-        if job.name == "job_fail":
+        if job.job_id == "job_fail":
             raise PipelineError("Simulated failure")
         # job_ok: inject rows directly
         conn.execute("DROP TABLE IF EXISTS dataset")
@@ -159,14 +159,14 @@ def test_failed_job_does_not_stop_subsequent_jobs(tmp_manifest, tmp_path):
     ):
         summaries = run_pipeline(cfg)
 
-    statuses = {s.job_name: s.status for s in summaries}
+    statuses = {s.job_id: s.status for s in summaries}
     assert statuses["job_fail"] == "failed"
     assert statuses["job_ok"] == "success"
 
 
 def test_only_flag_filters_jobs(tmp_manifest, tmp_path):
     yaml_jobs = (
-        "  - name: job_a\n"
+        "  - job_id: job_a\n"
         "    connector_params:\n"
         "      indicator_code: NY.GDP.MKTP.CD\n"
         "      country_code: JPN\n"
@@ -178,7 +178,7 @@ def test_only_flag_filters_jobs(tmp_manifest, tmp_path):
         "      filename: job_a\n"
         "    schema:\n"
         "      file: schemas/timeseries.yaml\n"
-        "  - name: job_b\n"
+        "  - job_id: job_b\n"
         "    connector_params:\n"
         "      indicator_code: SP.POP.TOTL\n"
         "      country_code: WLD\n"
@@ -197,4 +197,4 @@ def test_only_flag_filters_jobs(tmp_manifest, tmp_path):
 
     summaries = run_pipeline(cfg, dry_run=True, only="job_b")
     assert len(summaries) == 1
-    assert summaries[0].job_name == "job_b"
+    assert summaries[0].job_id == "job_b"
