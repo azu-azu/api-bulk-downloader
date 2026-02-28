@@ -36,8 +36,8 @@ def tmp_manifest(tmp_path: Path):
 
     def _make(jobs_yaml: str) -> Path:
         # Create the SQL files that most jobs reference
-        (tmp_path / "queries" / "worldbank").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "queries" / "worldbank" / "timeseries.sql").write_text(
+        (tmp_path / "queries").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "queries" / "timeseries.sql").write_text(
             "SELECT * FROM dataset WHERE year >= {{min_year}}"
         )
 

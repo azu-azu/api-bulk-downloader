@@ -28,8 +28,7 @@ api-bulk-downloader/
 │   └── default/                   #   WorldBank WDI pipeline
 │       ├── manifest.yaml          #     job definitions
 │       ├── queries/
-│       │   └── worldbank/
-│       │       └── timeseries.sql #     SQL template
+│       │   └── timeseries.sql     #     SQL template
 │       └── schemas/
 │           └── worldbank_timeseries.yaml  # column definitions (name + DuckDB type)
 ├── tests/                         # 30 unit tests
@@ -95,7 +94,7 @@ jobs:
         indicator_code: NY.GDP.MKTP.CD
         country_code: JPN        # ISO 3166-1 alpha-3, or "all"
     sql:
-      file: queries/worldbank/timeseries.sql
+      file: queries/timeseries.sql
       params:
         min_year: "2000"         # injected as SQL literal via {{min_year}}
     export:

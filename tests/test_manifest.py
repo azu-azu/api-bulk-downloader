@@ -15,7 +15,7 @@ def _wb_job(name: str, min_year: str = "2000") -> str:
         f"        indicator_code: NY.GDP.MKTP.CD\n"
         f"        country_code: JPN\n"
         f"    sql:\n"
-        f"      file: queries/worldbank/timeseries.sql\n"
+        f"      file: queries/timeseries.sql\n"
         f"      params:\n"
         f"        min_year: \"{min_year}\"\n"
         f"    export:\n"
@@ -45,15 +45,15 @@ def test_duplicate_name_raises(tmp_manifest):
 
 def test_unknown_type_raises(tmp_manifest, tmp_path):
     # Need to create the SQL file for this job's reference
-    (tmp_path / "queries" / "worldbank").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "queries" / "worldbank" / "timeseries.sql").write_text("SELECT 1")
+    (tmp_path / "queries").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "queries" / "timeseries.sql").write_text("SELECT 1")
     yaml_jobs = (
         "  - name: bad_job\n"
         "    source:\n"
         "      type: unknown_connector\n"
         "      params: {}\n"
         "    sql:\n"
-        "      file: queries/worldbank/timeseries.sql\n"
+        "      file: queries/timeseries.sql\n"
         "      params: {}\n"
         "    export:\n"
         "      filename: bad\n"
@@ -95,7 +95,7 @@ def test_enabled_false_excluded(tmp_manifest):
           "        indicator_code: SP.POP.TOTL\n"
           "        country_code: WLD\n"
           "    sql:\n"
-          "      file: queries/worldbank/timeseries.sql\n"
+          "      file: queries/timeseries.sql\n"
           "      params:\n"
           "        min_year: \"2000\"\n"
           "    export:\n"
