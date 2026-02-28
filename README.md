@@ -27,6 +27,8 @@ api-bulk-downloader/
 ├── queries/
 │   └── worldbank/
 │       └── timeseries.sql         # default SQL template
+├── schemas/
+│   └── worldbank_timeseries.yaml  # column definitions (name + DuckDB type)
 ├── configs/
 │   └── manifest.yaml              # job definitions
 ├── tests/                         # 30 unit tests
@@ -98,6 +100,8 @@ jobs:
     export:
       format: parquet            # overrides default
       filename: gdp_jpn          # output: outputs/gdp_jpn.parquet
+    schema:
+      file: schemas/worldbank_timeseries.yaml  # column definitions
 
   - name: salesforce_opps
     enabled: false               # skipped in all modes
@@ -106,6 +110,31 @@ jobs:
 
 `source.params` are passed as keyword arguments to the connector constructor.
 `sql.params` replace `{{key}}` placeholders in the SQL file.
+`schema.file` points to a YAML file that defines the dataset columns and their DuckDB types.
+
+---
+
+## Schema files
+
+Column definitions are declared in separate YAML files under `schemas/`:
+
+```yaml
+# schemas/worldbank_timeseries.yaml
+columns:
+  - name: country_code
+    type: VARCHAR
+  - name: year
+    type: INTEGER
+  - name: value
+    type: DOUBLE
+  # ...
+```
+
+Each entry requires `name` (column name) and `type` (DuckDB type string).
+The schema is loaded at manifest-parse time and used to:
+
+- build the `CREATE TABLE dataset (...)` DDL in `materialize()`
+- report available columns in `discover()`
 
 ---
 
@@ -152,7 +181,7 @@ flowchart LR
     CLI --> CONN
 
     subgraph CONN ["<u><b>connectors/worldbank_indicator.py</b></u>"]
-        DISC["Schema Discovery<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>discover()<br>固定スキーマ・ネットワーク不要"]
+        DISC["Schema Discovery<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>discover()<br>job.schema から列名取得・ネットワーク不要"]
         MAT["Data Fetch<br>-----<br><br><u><b>worldbank_indicator.py</b></u><br>materialize()<br>ページループ"]
         DISC -->|"--probe"| PROBED(["⏭ probe完了<br>カラム確認のみ"])
         DISC -->|full run| MAT
@@ -198,9 +227,10 @@ class ConnectorProtocol(Protocol):
 ```
 
 `runner.py` calls both methods for every enabled job.
-`discover()` is always a no-network call (returns a fixed schema).
-`materialize()` streams API pages directly into a per-job DuckDB connection —
-no full dataset is held in memory.
+`discover()` is always a no-network call — it reads column names from `job.schema`.
+`materialize()` builds the `CREATE TABLE` DDL dynamically from `job.schema` and
+streams API pages directly into a per-job DuckDB connection — no full dataset is
+held in memory.
 
 ### Per-job isolation
 
