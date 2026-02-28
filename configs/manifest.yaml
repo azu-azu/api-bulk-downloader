@@ -29,15 +29,3 @@ jobs:
         min_year: "2000"
     export:
       filename: population_latam
-
-  - name: salesforce_opps
-    enabled: false
-    source:
-      type: salesforce_report
-      params:
-        report_id: "00O000000000001"
-    sql:
-      file: queries/salesforce/report_default.sql
-      params: {}
-    export:
-      filename: sf_opps

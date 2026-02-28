@@ -8,7 +8,6 @@ import duckdb
 
 from src.connectors.protocol import ConnectorProtocol
 from src.connectors.worldbank_indicator import WorldBankIndicatorConnector
-from src.connectors.salesforce import SalesforceReportConnector
 from src.exceptions import PipelineError
 from src.exporter import export
 from src.manifest import JobConfig, ManifestConfig
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 # Registry: source.type → connector class
 _REGISTRY: dict[str, type] = {
     "worldbank_indicator": WorldBankIndicatorConnector,
-    "salesforce_report": SalesforceReportConnector,
 }
 
 
