@@ -67,7 +67,7 @@ ORDER BY year;
 
 ## salesforce
 
-> **現時点では未実装（stub）です。** `salesforce.py` は `NotImplementedError` を送出します。
+> **未実装。** コネクターファイルはまだ存在しません。
 
 Salesforce REST API / Bulk API から SObject データを取得するコネクター。
 
