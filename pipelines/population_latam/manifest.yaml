@@ -1,18 +1,18 @@
 defaults:
   output_root: outputs/
   export_format: csv
-
 jobs:
-  - job_id: population_latam
-    enabled: true
-    connector_params:
-      indicator_code: SP.POP.TOTL
-      country_code: LCN
-    sql:
-      file: queries/timeseries.sql
-      params:
-        min_year: "2000"
-    export:
-      filename: population_latam
-    schema:
-      file: schemas/timeseries.yaml
+- job_id: population_latam
+  enabled: true
+  connector_params:
+    indicator_code: SP.POP.TOTL
+    country_code: LCN
+  sql:
+    file: queries/timeseries.sql
+    params:
+      min_year: '2000'
+  export:
+    filename: population_latam
+    format: csv
+  schema:
+    file: schemas/timeseries.yaml

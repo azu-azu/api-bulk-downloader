@@ -4,6 +4,7 @@ Usage:
     wdi-pipeline run     [--manifest PATH] [--output-root PATH] [--dry-run] [--probe] [--only JOB_NAME]
     wdi-pipeline run-all [--pipeline-dir PATH] [--output-root PATH] [--dry-run] [--probe]
     wdi-pipeline list    [--pipeline-dir PATH]
+    wdi-pipeline gui     [--pipeline-dir PATH]
 
 Resolution order:
     manifest path  : --manifest      >  WDI_MANIFEST (.env)      >  error
@@ -125,6 +126,15 @@ def _build_parser() -> argparse.ArgumentParser:
     # --- list ---
     list_p = sub.add_parser("list", help="List all pipeline jobs and their configuration.")
     list_p.add_argument(
+        "--pipeline-dir",
+        default=None,
+        metavar="PATH",
+        help="Directory containing pipeline subdirs (overrides WDI_PIPELINE_DIR env var).",
+    )
+
+    # --- gui ---
+    gui_p = sub.add_parser("gui", help="Launch TUI dashboard.")
+    gui_p.add_argument(
         "--pipeline-dir",
         default=None,
         metavar="PATH",
@@ -280,6 +290,21 @@ def main(argv: list[str] | None = None) -> int:
         ]
         headers = ["Enabled", "indicator_code", "filename", "output dir", "column names"]
         print(tabulate(table, headers=headers, tablefmt="simple"))
+        return 0
+
+    elif args.command == "gui":
+        pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
+        if not pipeline_dir_str:
+            print(
+                "Error: pipeline dir is required. "
+                "Use --pipeline-dir or set WDI_PIPELINE_DIR in .env.",
+                file=sys.stderr,
+            )
+            return 1
+
+        from wdi_pipeline.tui import PipelineApp
+
+        PipelineApp(pipeline_dir_str).run()
         return 0
 
     return 0
