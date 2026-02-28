@@ -1,0 +1,18 @@
+{
+  "job_name": "population_latam",
+  "status": "probed",
+  "started_at": "2026-02-27T14:00:16+00:00",
+  "finished_at": "2026-02-27T14:00:16+00:00",
+  "duration_seconds": 0.0,
+  "rows_exported": null,
+  "export_path": null,
+  "discovery_columns": [
+    "country_code",
+    "country_name",
+    "indicator_code",
+    "indicator_name",
+    "year",
+    "value"
+  ],
+  "error": null
+}

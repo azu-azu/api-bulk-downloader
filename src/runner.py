@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any
+
+import duckdb
+
+from src.connectors.protocol import ConnectorProtocol
+from src.connectors.worldbank_indicator import WorldBankIndicatorConnector
+from src.connectors.salesforce import SalesforceReportConnector
+from src.exceptions import PipelineError
+from src.exporter import export
+from src.manifest import JobConfig, ManifestConfig
+from src.sql_template import render
+from src.summary import JobSummary, make_summary
+
+logger = logging.getLogger(__name__)
+
+# Registry: source.type → connector class
+_REGISTRY: dict[str, type] = {
+    "worldbank_indicator": WorldBankIndicatorConnector,
+    "salesforce_report": SalesforceReportConnector,
+}
+
+
+def run_pipeline(
+    manifest: ManifestConfig,
+    *,
+    dry_run: bool = False,
+    probe: bool = False,
+    only: str | None = None,
+) -> list[JobSummary]:
+    """Execute the pipeline for all enabled jobs (or a single named job).
+
+    Args:
+        manifest: Parsed and validated ManifestConfig.
+        dry_run: If True, skip all network calls and exports.
+        probe: If True, run discover() only (no materialize / export).
+        only: If set, execute only the job with this name.
+
+    Returns:
+        List of JobSummary objects, one per processed job.
+    """
+    jobs = manifest.enabled_jobs()
+    if only:
+        jobs = [j for j in jobs if j.name == only]
+        if not jobs:
+            raise PipelineError(
+                f"No enabled job named '{only}' found in manifest."
+            )
+
+    output_root = manifest.output_root
+    summaries: list[JobSummary] = []
+
+    for job in jobs:
+        summary = _run_job(job, output_root, dry_run=dry_run, probe=probe)
+        summary.write(output_root)
+        summaries.append(summary)
+
+    return summaries
+
+
+def _run_job(
+    job: JobConfig,
+    output_root: Path,
+    *,
+    dry_run: bool,
+    probe: bool,
+) -> JobSummary:
+    summary = make_summary(job.name)
+    logger.info("=== Job: %s ===", job.name)
+
+    if dry_run:
+        logger.info("[dry-run] Skipping job '%s' — no network calls.", job.name)
+        summary.status = "skipped"
+        summary.finish()
+        return summary
+
+    connector = _build_connector(job)
+
+    try:
+        # discover() is always called (no network required for worldbank)
+        discovery = connector.discover(job)
+        logger.info("discover: columns=%s", discovery.columns)
+
+        if probe:
+            logger.info("[probe] Job '%s' — discover complete, skipping materialize.", job.name)
+            summary.status = "probed"
+            summary.finish(discovery_columns=discovery.columns)
+            return summary
+
+        # Full execution
+        conn = duckdb.connect()
+        try:
+            connector.materialize(job, conn)
+
+            sql_text = job.sql.file.read_text()
+            rendered_sql, values = render(sql_text, job.sql.params)
+
+            ext = "csv" if job.export.format == "csv" else "parquet"
+            dest = (output_root / f"{job.export.filename}.{ext}").resolve()
+
+            rows = export(conn, rendered_sql, values, dest, job.export.format)
+        finally:
+            conn.close()
+
+        summary.status = "success"
+        summary.finish(
+            rows=rows,
+            export_path=dest,
+            discovery_columns=discovery.columns,
+        )
+        logger.info("Job '%s' done — %d rows → %s", job.name, rows, dest)
+
+    except PipelineError as exc:
+        logger.error("Job '%s' failed: %s", job.name, exc)
+        summary.status = "failed"
+        summary.finish(error=str(exc))
+    except Exception as exc:
+        logger.exception("Unexpected error in job '%s'", job.name)
+        summary.status = "failed"
+        summary.finish(error=f"Unexpected error: {exc}")
+
+    return summary
+
+
+def _build_connector(job: JobConfig) -> Any:
+    cls = _REGISTRY.get(job.source.type)
+    if cls is None:
+        raise PipelineError(
+            f"No connector registered for source type '{job.source.type}'."
+        )
+    return cls(**job.source.params)
