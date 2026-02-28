@@ -240,19 +240,18 @@ flowchart LR
 
     %% main flow
     CLI --> MAN
-    CLI --> RUN
+    MAN --> RUN
     MF -.->|"load"| MAN
     MAN -.->|"schema.file"| SCH
     MAN -.->|"sql.file"| SQL_FILE
 
     RUN -->|"--dry-run"| SKIP
     RUN -->|"enabled: true の job"| DISC
-    RUN -.->|"duckdb.connect()<br>（in-memory）"| DS
 
-    DISC -->|"returns DiscoveryResult(columns,...)"| RUN
     DISC -->|"--probe"| PROBED
     DISC -->|"full run"| MAT
 
+    MAT -.->|"duckdb.connect()<br>（in-memory）"| DS
     MAT <-->|"GET /v2/country/{cc}/indicator/{ic}?page=N<br>← [{meta}, [{records}]]"| WB
     MAT -->|"INSERT rows<br>(page by page)"| DS
 
@@ -261,6 +260,8 @@ flowchart LR
     RENDER -->|"sql string"| EXPORT
     EXPORT --> OUT_DATA
     EXPORT --> SUM
+    SKIP --> SUM
+    PROBED --> SUM
     SUM --> OUT_SUM
 
     classDef entry fill:#e0f7fa,stroke:#0097a7,color:#000
