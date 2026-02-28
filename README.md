@@ -19,6 +19,7 @@ api-bulk-downloader/
 │   ├── sql_template.py            #   {{key}} → SQL literal renderer
 │   ├── exporter.py                #   DuckDB COPY → CSV / Parquet
 │   ├── summary.py                 #   per-job JSON summary
+│   ├── tui.py                     #   Textual TUI dashboard
 │   ├── logging_setup.py
 │   ├── exceptions.py
 │   └── connectors/
@@ -48,7 +49,7 @@ pip install -e .
 ```
 
 This installs the `wdi-pipeline` command and all dependencies
-(`requests`, `urllib3`, `duckdb`, `pyyaml`, `python-dotenv`, `tabulate`).
+(`requests`, `urllib3`, `duckdb`, `pyyaml`, `python-dotenv`, `tabulate`, `textual`).
 
 ---
 
@@ -124,6 +125,33 @@ true       SP.POP.TOTL       population_latam.csv  outputs       country_code, c
 ```
 
 Jobs with `enabled: false` appear at the bottom of the table.
+
+### `gui` — interactive TUI dashboard
+
+```bash
+# Launch the TUI (uses WDI_PIPELINE_DIR from .env)
+wdi-pipeline gui
+
+# Specify the pipeline directory explicitly
+wdi-pipeline gui --pipeline-dir pipelines/
+```
+
+Displays a live table of all jobs. Key bindings:
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Move cursor |
+| `q` | Quit |
+
+Buttons:
+
+| Button | Action |
+|--------|--------|
+| **Toggle Enabled** | Flip `enabled` for the selected job and save to `manifest.yaml` |
+| **Edit** | Open a modal to edit `indicator_code`, `country_code`, `filename`, `format`, `sql.params`, and `enabled`; Save writes back to `manifest.yaml` |
+
+The table order stays fixed during the session. Rows are re-sorted (enabled
+descending → `indicator_code` ascending) the next time the app is launched.
 
 Resolution order:
 
