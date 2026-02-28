@@ -239,8 +239,8 @@ flowchart LR
     OUT_SUM[/"<u><b>outputs/</b></u><br>*_summary.json"/]
 
     %% main flow
-    CLI --> RUN
-    RUN --> MAN
+    CLI --> MAN
+    MAN --> RUN
     MF -.->|"load"| MAN
     MAN -.->|"schema.file"| SCH
     MAN -.->|"sql.file"| SQL_FILE
