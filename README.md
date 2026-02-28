@@ -143,8 +143,9 @@ flowchart LR
         SQL_FILE[/"<u><b>queries/worldbank/timeseries.sql</b></u><br>SQLテンプレ"/]
     end
     %% auxiliary (dashed) to show "inputs"
-    MANIFEST -.->|"--manifest"| CLI
-    SQL_FILE -.->|"--sql file"| CLI
+    MANIFEST -.-> CLI
+    MANIFEST -.-> SQL_FILE
+
 
     %% runtime flow
     CLI -->|"--dry-run"| SKIP(["⏭ skipped"])
@@ -173,14 +174,16 @@ flowchart LR
     EXPORT --> OUT_DATA[/"<u><b>outputs/</b></u><br>*.csv / *.parquet"/]
     EXPORT --> OUT_SUM[/"<u><b>outputs/</b></u><br>*_summary.json"/]
 
+    classDef entry   fill:#e0f7fa,stroke:#0097a7, color:#000
     classDef file    fill:#e8f0fe,stroke:#4a7fcb, color:#000
     classDef ext     fill:#fff3e0,stroke:#e6a817, color:#000
     classDef db      fill:#e8f5e9,stroke:#43a047, color:#000
     classDef term    fill:#f3e5f5,stroke:#8e24aa, color:#000
     classDef out     fill:#fce4ec,stroke:#e91e63, color:#000
 
+    class CLI entry
     class MANIFEST,SQL_FILE file
-    class WB,CLI ext
+    class WB ext
     class DS db
     class SKIP,PROBED term
     class OUT_DATA,OUT_SUM out
