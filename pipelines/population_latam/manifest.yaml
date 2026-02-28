@@ -3,7 +3,7 @@ defaults:
   export_format: csv
 
 jobs:
-  - name: population_latam
+  - job_id: population_latam
     connector_params:
       indicator_code: SP.POP.TOTL
       country_code: LCN

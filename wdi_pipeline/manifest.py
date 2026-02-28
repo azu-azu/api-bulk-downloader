@@ -39,7 +39,7 @@ class SqlConfig:
 
 @dataclass
 class JobConfig:
-    name: str
+    job_id: str
     connector_params: dict[str, Any]
     sql: SqlConfig
     export: ExportConfig
@@ -84,15 +84,15 @@ def load_manifest(manifest_path: str | Path, base_dir: Path | None = None) -> Ma
         raise ManifestValidationError("'jobs' must be a list.")
 
     jobs: list[JobConfig] = []
-    seen_names: set[str] = set()
+    seen_ids: set[str] = set()
 
     for i, raw_job in enumerate(raw_jobs):
         job = _parse_job(raw_job, i, base_dir, default_format)
-        if job.name in seen_names:
+        if job.job_id in seen_ids:
             raise ManifestValidationError(
-                f"Duplicate job name: '{job.name}'"
+                f"Duplicate job id: '{job.job_id}'"
             )
-        seen_names.add(job.name)
+        seen_ids.add(job.job_id)
         jobs.append(job)
 
     return ManifestConfig(
@@ -107,28 +107,28 @@ def _parse_job(
     if not isinstance(raw, dict):
         raise ManifestValidationError(f"Job at index {idx} must be a mapping.")
 
-    name = raw.get("name")
-    if not name:
-        raise ManifestValidationError(f"Job at index {idx} is missing 'name'.")
+    job_id = raw.get("job_id")
+    if not job_id:
+        raise ManifestValidationError(f"Job at index {idx} is missing 'job_id'.")
 
     enabled = raw.get("enabled", True)
 
     # connector_params
     raw_connector_params = raw.get("connector_params") or {}
     if not isinstance(raw_connector_params, dict):
-        raise ManifestValidationError(f"Job '{name}': 'connector_params' must be a mapping.")
+        raise ManifestValidationError(f"Job '{job_id}': 'connector_params' must be a mapping.")
 
     # sql
     raw_sql = raw.get("sql")
     if not isinstance(raw_sql, dict):
-        raise ManifestValidationError(f"Job '{name}': 'sql' must be a mapping.")
+        raise ManifestValidationError(f"Job '{job_id}': 'sql' must be a mapping.")
     sql_file_rel = raw_sql.get("file")
     if not sql_file_rel:
-        raise ManifestValidationError(f"Job '{name}': 'sql.file' is required.")
+        raise ManifestValidationError(f"Job '{job_id}': 'sql.file' is required.")
     sql_file = (base_dir / sql_file_rel).resolve()
     if not sql_file.exists():
         raise ManifestValidationError(
-            f"Job '{name}': SQL file not found: {sql_file}"
+            f"Job '{job_id}': SQL file not found: {sql_file}"
         )
     sql_params = raw_sql.get("params") or {}
     sql_cfg = SqlConfig(file=sql_file, params={k: str(v) for k, v in sql_params.items()})
@@ -138,41 +138,41 @@ def _parse_job(
     fmt = raw_export.get("format", default_format).lower()
     if fmt not in _KNOWN_FORMATS:
         raise ManifestValidationError(
-            f"Job '{name}': unknown export format '{fmt}'. "
+            f"Job '{job_id}': unknown export format '{fmt}'. "
             f"Known formats: {sorted(_KNOWN_FORMATS)}"
         )
-    filename = raw_export.get("filename") or name
+    filename = raw_export.get("filename") or job_id
     export_cfg = ExportConfig(filename=filename, format=fmt)
 
     # schema
     raw_schema = raw.get("schema")
     if not isinstance(raw_schema, dict):
-        raise ManifestValidationError(f"Job '{name}': 'schema' must be a mapping.")
+        raise ManifestValidationError(f"Job '{job_id}': 'schema' must be a mapping.")
     schema_file_rel = raw_schema.get("file")
     if not schema_file_rel:
-        raise ManifestValidationError(f"Job '{name}': 'schema.file' is required.")
+        raise ManifestValidationError(f"Job '{job_id}': 'schema.file' is required.")
     schema_file = (base_dir / schema_file_rel).resolve()
     if not schema_file.exists():
         raise ManifestValidationError(
-            f"Job '{name}': schema file not found: {schema_file}"
+            f"Job '{job_id}': schema file not found: {schema_file}"
         )
     with schema_file.open() as fh:
         raw_schema_data = yaml.safe_load(fh)
     if not isinstance(raw_schema_data, dict) or "columns" not in raw_schema_data:
         raise ManifestValidationError(
-            f"Job '{name}': schema file must contain a 'columns' list."
+            f"Job '{job_id}': schema file must contain a 'columns' list."
         )
     columns: list[ColumnDef] = []
     for col_entry in raw_schema_data["columns"]:
         if not isinstance(col_entry, dict) or "name" not in col_entry or "type" not in col_entry:
             raise ManifestValidationError(
-                f"Job '{name}': each schema column must have 'name' and 'type'."
+                f"Job '{job_id}': each schema column must have 'name' and 'type'."
             )
         columns.append(ColumnDef(name=col_entry["name"], type=col_entry["type"]))
     schema_cfg = SchemaConfig(columns=columns)
 
     return JobConfig(
-        name=name,
+        job_id=job_id,
         connector_params=raw_connector_params,
         sql=sql_cfg,
         export=export_cfg,

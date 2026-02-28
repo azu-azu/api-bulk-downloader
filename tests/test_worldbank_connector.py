@@ -54,7 +54,7 @@ def _make_wb_job(tmp_path: Path) -> JobConfig:
     dummy_sql = tmp_path / "dummy.sql"
     dummy_sql.write_text("SELECT * FROM dataset")
     return JobConfig(
-        name="test",
+        job_id="test",
         connector_params={},
         sql=SqlConfig(file=dummy_sql, params={}),
         export=ExportConfig(filename="test", format="csv"),

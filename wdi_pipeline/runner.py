@@ -37,10 +37,10 @@ def run_pipeline(
     """
     jobs = manifest.enabled_jobs()
     if only:
-        jobs = [j for j in jobs if j.name == only]
+        jobs = [j for j in jobs if j.job_id == only]
         if not jobs:
             raise PipelineError(
-                f"No enabled job named '{only}' found in manifest."
+                f"No enabled job with id '{only}' found in manifest."
             )
 
     output_root = manifest.output_root
@@ -61,12 +61,12 @@ def _run_job(
     dry_run: bool,
     probe: bool,
 ) -> JobSummary:
-    summary = make_summary(job.name)
+    summary = make_summary(job.job_id)
     t0 = time.monotonic()
-    logger.info("=== Job: %s ===", job.name)
+    logger.info("=== Job: %s ===", job.job_id)
 
     if dry_run:
-        logger.info("[dry-run] Skipping job '%s' — no network calls.", job.name)
+        logger.info("[dry-run] Skipping job '%s' — no network calls.", job.job_id)
         summary.status = "skipped"
         summary.finish()
         return summary
@@ -80,7 +80,7 @@ def _run_job(
         logger.info("  discover done: %d columns", len(discovery.columns))
 
         if probe:
-            logger.info("[probe] Job '%s' — discover complete, skipping materialize.", job.name)
+            logger.info("[probe] Job '%s' — discover complete, skipping materialize.", job.job_id)
             summary.status = "probed"
             summary.finish(discovery_columns=discovery.columns)
             return summary
@@ -110,14 +110,14 @@ def _run_job(
             export_path=dest,
             discovery_columns=discovery.columns,
         )
-        logger.info("Job '%s' done — %d rows → %s  (%.2f s)", job.name, rows, dest, elapsed)
+        logger.info("Job '%s' done — %d rows → %s  (%.2f s)", job.job_id, rows, dest, elapsed)
 
     except PipelineError as exc:
-        logger.error("Job '%s' failed: %s", job.name, exc)
+        logger.error("Job '%s' failed: %s", job.job_id, exc)
         summary.status = "failed"
         summary.finish(error=str(exc))
     except Exception as exc:
-        logger.exception("Unexpected error in job '%s'", job.name)
+        logger.exception("Unexpected error in job '%s'", job.job_id)
         summary.status = "failed"
         summary.finish(error=f"Unexpected error: {exc}")
 
