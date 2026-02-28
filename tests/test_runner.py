@@ -142,7 +142,6 @@ def test_failed_job_does_not_stop_subsequent_jobs(tmp_manifest, tmp_path):
     cfg.output_root = tmp_path / "outputs"
 
     ok_data = _sample_data(2)
-    ok_page = _make_page(1, 1, ok_data)
 
     def _materialize_side_effect(job, conn):
         if job.name == "job_fail":

@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 @dataclass
 class DiscoveryResult:
     columns: list[str] = field(default_factory=list)
-    metadata: dict = field(default_factory=dict)
 
 
 class ConnectorProtocol(Protocol):
