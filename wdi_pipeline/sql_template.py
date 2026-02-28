@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from src.exceptions import SQLTemplateError
+from wdi_pipeline.exceptions import SQLTemplateError
 
 _PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 

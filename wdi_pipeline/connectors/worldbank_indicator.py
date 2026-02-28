@@ -5,11 +5,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import requests
-import urllib3
 from urllib3.util.retry import Retry
 
-from src.connectors.protocol import DiscoveryResult
-from src.exceptions import ConnectorError
+from wdi_pipeline.connectors.protocol import DiscoveryResult
+from wdi_pipeline.exceptions import ConnectorError
 
 logger = logging.getLogger(__name__)
 

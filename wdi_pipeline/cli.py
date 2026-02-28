@@ -1,7 +1,7 @@
 """CLI entry point for the batch data pipeline.
 
 Usage:
-    python -m cli run --manifest configs/manifest.yaml [--dry-run] [--probe] [--only JOB_NAME]
+    wdi-pipeline run --manifest configs/manifest.yaml [--dry-run] [--probe] [--only JOB_NAME]
 """
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from src.logging_setup import setup_logging
-from src.manifest import load_manifest
-from src.runner import run_pipeline
+from wdi_pipeline.logging_setup import setup_logging
+from wdi_pipeline.manifest import load_manifest
+from wdi_pipeline.runner import run_pipeline
 
 
 def _build_parser() -> argparse.ArgumentParser:

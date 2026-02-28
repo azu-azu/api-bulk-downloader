@@ -4,7 +4,6 @@
 API固有のロジックは一切持たない。コネクタの詳細は connectors/ に集約する。
 """
 import logging
-import time
 from pathlib import Path
 from typing import Protocol
 
@@ -17,10 +16,6 @@ from api_bulk_downloader.core.logger import DownloadMetrics
 
 log = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# コネクタプロトコル — すべてのコネクタはこの2つのプロパティを実装する
-# ---------------------------------------------------------------------------
 
 class ConnectorProtocol(Protocol):
     """データソースコネクタが満たすべき最小インターフェース。"""
@@ -35,10 +30,6 @@ class ConnectorProtocol(Protocol):
         """ダウンロードリクエストに付与するHTTPヘッダ（認証情報など）。"""
         ...
 
-
-# ---------------------------------------------------------------------------
-# ダウンローダー
-# ---------------------------------------------------------------------------
 
 class BulkDownloader:
     """
@@ -62,73 +53,37 @@ class BulkDownloader:
         self._timeout = timeout
         self._session = self._build_session(max_retries, backoff_factor)
 
-    # ------------------------------------------------------------------
-    # 公開API
-    # ------------------------------------------------------------------
-
     def download(self, filename: str, *, count_rows: bool = False) -> DownloadMetrics:
-        """
-        コネクタのリソースを *dest_dir/filename* へストリーム書き込みする。
-
-        ダウンロードしたファイルがZIPアーカイブの場合は自動的に展開し、
-        アーカイブ本体は展開先と同じディレクトリに保持する。
-
-        Parameters
-        ----------
-        filename:
-            *dest_dir* 内に書き込むファイル名。
-        count_rows:
-            True のとき、ダウンロード後に主要CSVのデータ行数を数える。
-            ファイル全体を再スキャンするためデフォルトは無効。
-            大規模データ（40万行超）では約2秒の追加コストがかかる。
-
-        Returns
-        -------
-        DownloadMetrics
-            計測値が格納されたインスタンス。
-        """
         metrics = DownloadMetrics()
         dest_file = self._dest_dir / filename
-
         log.info("Starting download: %s → %s", self._connector.download_url, dest_file)
-
         response = self._get(self._connector.download_url)
         metrics.bytes_downloaded = file_utils.stream_to_file(
             response, dest_file, chunk_size=self._chunk_size
         )
-
-        # ZIPなら展開する
         if file_utils.is_zip(dest_file):
             log.info("Archive detected — extracting to %s", self._dest_dir)
             extracted = file_utils.extract_zip(dest_file, self._dest_dir)
             if count_rows:
                 csvs = [p for p in extracted if p.suffix.lower() == ".csv"]
                 if csvs:
+                    primary_csv = file_utils.choose_primary_csv(csvs)
                     try:
-                        primary_csv = file_utils.choose_primary_csv(csvs)
                         metrics.row_count = file_utils.count_csv_rows(primary_csv)
-                        log.info(
-                            "Row count (%s): %d", primary_csv.name, metrics.row_count
-                        )
+                        log.info("Row count (%s): %d", primary_csv.name, metrics.row_count)
                     except Exception as exc:
                         log.warning("Could not count CSV rows: %s", exc)
         elif dest_file.suffix.lower() == ".csv" and count_rows:
             try:
                 metrics.row_count = file_utils.count_csv_rows(dest_file)
-                log.info("Row count (%s): %d", dest_file.name, metrics.row_count)
+                log.info("Row count: %d", metrics.row_count)
             except Exception as exc:
                 log.warning("Could not count CSV rows: %s", exc)
-
         metrics.finish()
         metrics.log(log)
         return metrics
 
-    # ------------------------------------------------------------------
-    # 内部ヘルパー
-    # ------------------------------------------------------------------
-
     def _get(self, url: str) -> requests.Response:
-        """GETリクエストを実行してストリーミングレスポンスを返す。"""
         response = self._session.get(
             url,
             headers=self._connector.request_headers,
@@ -140,12 +95,6 @@ class BulkDownloader:
 
     @staticmethod
     def _build_session(max_retries: int, backoff_factor: float) -> requests.Session:
-        """
-        一時的なエラーに対して自動リトライする requests.Session を生成する。
-
-        HTTP 429・500・502・503・504 を対象に指数バックオフでリトライする:
-            待機時間 = backoff_factor × 2^(リトライ回数 - 1)
-        """
         retry = Retry(
             total=max_retries,
             backoff_factor=backoff_factor,
