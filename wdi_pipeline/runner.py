@@ -30,7 +30,7 @@ def run_pipeline(
         manifest: Parsed and validated ManifestConfig.
         dry_run: If True, skip all network calls and exports.
         probe: If True, run discover() only (no materialize / export).
-        only: If set, execute only the job with this name.
+        only: If set, execute only the job with this id.
 
     Returns:
         List of JobSummary objects, one per processed job.
@@ -93,13 +93,13 @@ def _run_job(
             logger.info("  materialize done")
 
             sql_text = job.sql.file.read_text()
-            rendered_sql, values = render(sql_text, job.sql.params)
+            rendered_sql, _ = render(sql_text, job.sql.params)
 
             ext = "csv" if job.export.format == "csv" else "parquet"
             dest = (output_root / f"{job.export.filename}.{ext}").resolve()
 
             logger.info("  export …")
-            rows = export(conn, rendered_sql, values, dest, job.export.format)
+            rows = export(conn, rendered_sql, dest, job.export.format)
         finally:
             conn.close()
 

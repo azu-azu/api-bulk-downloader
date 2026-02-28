@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 def export(
     conn: Any,  # duckdb.DuckDBPyConnection
     sql: str,
-    values: list,
     dest: Path,
     fmt: str,
 ) -> int:
@@ -21,7 +20,6 @@ def export(
     Args:
         conn: An open DuckDB connection that already has the 'dataset' TABLE.
         sql: A rendered SQL string ({{}} placeholders already replaced with literal values).
-        values: Bind parameter list — always empty after render(); kept for API compatibility.
         dest: Destination file path (created / overwritten).
         fmt: Export format — 'csv' or 'parquet' (case-insensitive).
 
