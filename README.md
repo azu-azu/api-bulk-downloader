@@ -164,11 +164,11 @@ The materialized API data is always available as a DuckDB table named `dataset`.
 
 ```mermaid
 flowchart LR
-    CLI["Entry Point<br>-----<br><br><u><b>cli.py</b></u><br>main()<br>argparse · モード選択"]
+    CLI["Entry Point<br>-----<br><br><u><b>cli.py</b></u><br>main()"]
 
-    RUN["Job Loop<br>-----<br><br><u><b>runner.py</b></u><br>run_pipeline()<br>dry-run / probe / full の分岐"]
+    RUN["Job Loop<br>-----<br><br><u><b>runner.py</b></u><br>run_pipeline()<br>job を順に実行する"]
 
-    MAN["Config Load<br>-----<br><br><u><b>manifest.py</b></u><br>load_manifest()<br>YAML 解析 + スキーマ構築"]
+    MAN["Config Load<br>-----<br><br><u><b>manifest.py</b></u><br>load_manifest()<br>job.schema を作る"]
 
     %% inputs (auxiliary)
     subgraph PRE ["事前設定"]
@@ -179,20 +179,20 @@ flowchart LR
 
     SKIP(["⏭ skipped"])
 
-    subgraph CONN ["connectors/* (selected by source.type)"]
-        DISC["Schema Discovery<br>-----<br><br><u><b>connector</b></u><br>discover()<br>job.schema から列名取得"]
-        MAT["Data Fetch<br>-----<br><br><u><b>connector</b></u><br>materialize()<br>ページループ · INSERT"]
+    subgraph CONN ["<u><b>connectors/(source name)</b></u>"]
+        DISC["Schema Discovery<br>-----<br><br>discover()<br>job.schema から列名取得"]
+        MAT["Data Fetch<br>-----<br><br>materialize()<br>テーブル作成"]
     end
 
     PROBED(["⏭ probe 完了<br>列名確認のみ"])
 
     WB[/"<u><b>World Bank Indicator API</b></u><br>JSON ページング · urllib3.Retry"/]
 
-    DS[("TABLE dataset<br>-----<br>country_code · country_name<br>indicator_code · indicator_name<br>year · value")]
+    DS[("（メモリ上）<br>TABLE dataset<br>-----<br><br>（例）<br>country_code<br>country_name<br>indicator_code<br>indicator_name<br>year<br>value")]
 
     RENDER["SQL Render<br>-----<br><br><u><b>sql_template.py</b></u><br>render()<br>{{key}} → SQL リテラル"]
 
-    EXPORT["Export<br>-----<br><br><u><b>exporter.py</b></u><br>export()<br>CREATE TEMP VIEW → COPY TO file"]
+    EXPORT["Export<br>-----<br><br><u><b>exporter.py</b></u><br>export()<br>SQL実行・ファイル生成"]
 
     SUM["Summary<br>-----<br><br><u><b>summary.py</b></u><br>write()<br>ジョブ結果を JSON 出力"]
 
@@ -207,7 +207,8 @@ flowchart LR
     MAN -.->|"sql.file"| SQL_FILE
 
     RUN -->|"--dry-run"| SKIP
-    RUN -->|"for each enabled job"| DISC
+    RUN -->|"enabled: true の job"| DISC
+    RUN -.->|"duckdb.connect()<br>（in-memory）"| DS
 
     DISC -->|"--probe"| PROBED
     DISC -->|"full run"| MAT
@@ -215,9 +216,9 @@ flowchart LR
     MAT <-->|"GET /v2/country/{cc}/indicator/{ic}?page=N<br>← [{meta}, [{records}]]"| WB
     MAT -->|"INSERT rows<br>(page by page)"| DS
 
-    DS --> RENDER
+    DS -->|"data source (TABLE dataset)"| EXPORT
     SQL_FILE -.->|"template"| RENDER
-    RENDER --> EXPORT
+    RENDER -->|"sql string"| EXPORT
     EXPORT --> OUT_DATA
     EXPORT --> SUM
     SUM --> OUT_SUM
