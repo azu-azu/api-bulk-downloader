@@ -1,0 +1,19 @@
+defaults:
+  output_root: outputs/
+  export_format: parquet
+
+jobs:
+  - name: gdp_jpn
+    source:
+      type: worldbank_indicator
+      params:
+        indicator_code: NY.GDP.MKTP.CD
+        country_code: JPN
+    sql:
+      file: queries/timeseries.sql
+      params:
+        min_year: "2000"
+    export:
+      filename: gdp_jpn
+    schema:
+      file: schemas/timeseries.yaml
