@@ -16,11 +16,6 @@ from wdi_pipeline.summary import JobSummary, make_summary
 
 logger = logging.getLogger(__name__)
 
-# Registry: source.type → connector class
-_REGISTRY: dict[str, type] = {
-    "worldbank_indicator": WorldBankIndicatorConnector,
-}
-
 
 def run_pipeline(
     manifest: ManifestConfig,
@@ -130,9 +125,4 @@ def _run_job(
 
 
 def _build_connector(job: JobConfig) -> Any:
-    cls = _REGISTRY.get(job.source.type)
-    if cls is None:
-        raise PipelineError(
-            f"No connector registered for source type '{job.source.type}'."
-        )
-    return cls(**job.source.params)
+    return WorldBankIndicatorConnector(**job.connector_params)
