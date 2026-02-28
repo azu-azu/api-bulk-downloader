@@ -240,7 +240,8 @@ flowchart LR
 
     %% main flow
     CLI --> MAN
-    MAN --> RUN
+    CLI --> RUN
+    MAN -.->|"ManifestConfig"| RUN
     MF -.->|"load"| MAN
     MAN -.->|"schema.file"| SCH
     MAN -.->|"sql.file"| SQL_FILE
