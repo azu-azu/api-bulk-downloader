@@ -57,7 +57,6 @@ class JobConfig:
 @dataclass
 class ManifestConfig:
     output_root: Path
-    export_format: str
     jobs: list[JobConfig]
 
     def enabled_jobs(self) -> list[JobConfig]:
@@ -105,7 +104,6 @@ def load_manifest(manifest_path: str | Path, base_dir: Path | None = None) -> Ma
 
     return ManifestConfig(
         output_root=output_root,
-        export_format=default_format,
         jobs=jobs,
     )
 

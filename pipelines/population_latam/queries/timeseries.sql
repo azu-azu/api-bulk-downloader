@@ -7,4 +7,4 @@ SELECT
     value
 FROM dataset
 WHERE year >= {{min_year}}
-ORDER BY country_code, year
+ORDER BY country_code, year;
