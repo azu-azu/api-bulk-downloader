@@ -1,13 +1,20 @@
 """CLI entry point for the batch data pipeline.
 
 Usage:
-    wdi-pipeline run --manifest pipelines/default/manifest.yaml [--dry-run] [--probe] [--only JOB_NAME]
+    wdi-pipeline run [--manifest PATH] [--output-root PATH] [--dry-run] [--probe] [--only JOB_NAME]
+
+Resolution order:
+    manifest path  : --manifest  >  WDI_MANIFEST (.env)   >  error
+    output root    : --output-root  >  WDI_OUTPUT_ROOT (.env)  >  manifest default
 """
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 from wdi_pipeline.logging_setup import setup_logging
 from wdi_pipeline.manifest import load_manifest
@@ -24,9 +31,15 @@ def _build_parser() -> argparse.ArgumentParser:
     run_p = sub.add_parser("run", help="Execute the pipeline.")
     run_p.add_argument(
         "--manifest",
-        required=True,
+        default=None,
         metavar="PATH",
-        help="Path to manifest.yaml",
+        help="Path to manifest.yaml (overrides WDI_MANIFEST env var).",
+    )
+    run_p.add_argument(
+        "--output-root",
+        default=None,
+        metavar="PATH",
+        help="Output directory (overrides WDI_OUTPUT_ROOT env var and manifest default).",
     )
     run_p.add_argument(
         "--dry-run",
@@ -54,14 +67,31 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_dotenv()
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
     setup_logging(args.log_level)
 
     if args.command == "run":
-        manifest_path = Path(args.manifest)
+        # Resolve manifest path: CLI > env > error
+        manifest_str = args.manifest or os.environ.get("WDI_MANIFEST")
+        if not manifest_str:
+            print(
+                "Error: manifest path is required. "
+                "Use --manifest or set WDI_MANIFEST in .env.",
+                file=sys.stderr,
+            )
+            return 1
+        manifest_path = Path(manifest_str)
         manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
+
+        # Resolve output_root: CLI > env > manifest default
+        output_root_str = args.output_root or os.environ.get("WDI_OUTPUT_ROOT")
+        if output_root_str:
+            manifest.output_root = Path(output_root_str)
+
         summaries = run_pipeline(
             manifest,
             dry_run=args.dry_run,

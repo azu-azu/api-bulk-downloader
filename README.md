@@ -52,22 +52,40 @@ This installs the `wdi-pipeline` command and all dependencies
 
 ## Usage
 
+Set defaults in `.env` (optional):
+
+```dotenv
+WDI_MANIFEST=pipelines/default/manifest.yaml
+WDI_OUTPUT_ROOT=outputs/
+```
+
 ```bash
+# Run with .env defaults (no flags needed)
+wdi-pipeline run
+
+# Override manifest or output root at runtime
+wdi-pipeline run --manifest pipelines/other/manifest.yaml
+wdi-pipeline run --output-root tmp/
+
 # Validate manifest structure — no network calls
-wdi-pipeline run --manifest pipelines/default/manifest.yaml --dry-run
+wdi-pipeline run --dry-run
 
 # Discover column schema only — no data fetched
-wdi-pipeline run --manifest pipelines/default/manifest.yaml --probe
-
-# Run all enabled jobs
-wdi-pipeline run --manifest pipelines/default/manifest.yaml
+wdi-pipeline run --probe
 
 # Run a single job
-wdi-pipeline run --manifest pipelines/default/manifest.yaml --only gdp_jpn
+wdi-pipeline run --only gdp_jpn
 
 # Verbose logging
-wdi-pipeline run --manifest pipelines/default/manifest.yaml --log-level DEBUG
+wdi-pipeline run --log-level DEBUG
 ```
+
+Resolution order:
+
+| Setting | Priority 1 | Priority 2 | Priority 3 |
+|---|---|---|---|
+| manifest path | `--manifest` | `WDI_MANIFEST` | error |
+| output root | `--output-root` | `WDI_OUTPUT_ROOT` | manifest default |
 
 | Mode | `discover()` | `materialize()` | SQL / export |
 |------|:---:|:---:|:---:|
