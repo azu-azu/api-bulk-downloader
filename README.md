@@ -211,7 +211,7 @@ flowchart LR
 
     %% inputs (auxiliary)
     subgraph PRE ["<u><b>pipelines/*/</b></u><br>（事前設定）"]
-        MF[/"<u><b>manifest.yaml</b></u><br>job定義"/]
+        MF[/"<u><b>manifest.yaml</b></u><br>job定義<br><br>1 job = 1 CSV出力"/]
         SCH[/"<u><b>schemas/timeseries.yaml</b></u><br>列定義 (name · type)"/]
         SQL_FILE[/"<u><b>queries/timeseries.sql</b></u><br>SQL テンプレ"/]
     end
