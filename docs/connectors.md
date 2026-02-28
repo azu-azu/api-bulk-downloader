@@ -1,6 +1,6 @@
 # コネクター リファレンス
 
-各コネクターの `source` フィールド設計と利用例をまとめます。
+各コネクターの `connector_params` 設計と利用例をまとめます。
 
 ---
 
@@ -8,7 +8,7 @@
 
 World Bank Indicators API からデータを取得する既存コネクター。
 
-### source.params
+### connector_params
 
 | パラメーター | 必須 | 説明 |
 |---|---|---|
@@ -24,7 +24,7 @@ defaults:
   export_format: csv
 
 jobs:
-  - name: gdp_jpn
+  - job_id: gdp_jpn
     connector_params:
       indicator_code: NY.GDP.MKTP.CD
       country_code: JPN
@@ -71,7 +71,7 @@ ORDER BY year;
 
 Salesforce REST API / Bulk API から SObject データを取得するコネクター。
 
-### source.params
+### connector_params
 
 | パラメーター | 必須 | 説明 |
 |---|---|---|
@@ -86,7 +86,7 @@ defaults:
   export_format: csv
 
 jobs:
-  - name: sf_accounts
+  - job_id: sf_accounts
     connector_params:
       object_name: Account          # 取得対象の SObject 名
     sql:
@@ -129,7 +129,7 @@ ORDER BY name;
 ### 認証情報の扱い
 
 Salesforce の資格情報はマニフェストに書かず、**環境変数** で渡します。
-`source.params` には認証情報を含めません。
+`connector_params` には認証情報を含めません。
 
 ```dotenv
 # .env
