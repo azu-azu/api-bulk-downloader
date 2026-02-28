@@ -22,7 +22,7 @@ api-bulk-downloader/
 │   ├── logging_setup.py
 │   ├── exceptions.py
 │   └── connectors/
-│       ├── protocol.py            #   ConnectorProtocol, DiscoveryResult
+│       ├── protocol.py            #   DiscoveryResult
 │       └── worldbank_indicator.py #   JSON paging + Session DI
 ├── pipelines/                     # one subdir per pipeline (= one job = one output file)
 │   ├── gdp_jpn/
@@ -33,7 +33,7 @@ api-bulk-downloader/
 │       ├── manifest.yaml
 │       ├── queries/timeseries.sql
 │       └── schemas/timeseries.yaml
-├── tests/                         # 37 unit tests
+├── tests/                         # 36 unit tests
 ├── archive/
 │   └── api_bulk_downloader_v1/    # v1 reference (ZIP/stream approach)
 └── pyproject.toml
@@ -101,7 +101,7 @@ wdi-pipeline run-all --pipeline-dir pipelines/ --allow-overwrite
 ```
 
 `run-all` performs a preflight check before executing: if two pipelines would write to
-the same path (same `export.filename` or same `job.name`), it exits with an error.
+the same path (same `export.filename` or same `job.job_id`), it exits with an error.
 Use `--allow-overwrite` to disable the check (last write wins).
 
 Resolution order:
@@ -131,12 +131,10 @@ defaults:
   export_format: parquet     # default format (csv or parquet) — Excel (.xlsx) is not supported
 
 jobs:
-  - name: gdp_jpn
-    source:
-      type: worldbank_indicator
-      params:
-        indicator_code: NY.GDP.MKTP.CD
-        country_code: JPN        # ISO 3166-1 alpha-3, or "all"
+  - job_id: gdp_jpn
+    connector_params:
+      indicator_code: NY.GDP.MKTP.CD
+      country_code: JPN        # ISO 3166-1 alpha-3, or "all"
     sql:
       file: queries/timeseries.sql
       params:
@@ -147,7 +145,7 @@ jobs:
       file: schemas/timeseries.yaml  # column definitions
 ```
 
-`source.params` are passed as keyword arguments to the connector constructor.
+`connector_params` are passed as keyword arguments to the connector constructor.
 `sql.params` replace `{{key}}` placeholders in the SQL file.
 `schema.file` points to a YAML file that defines the dataset columns and their DuckDB types.
 
@@ -280,12 +278,13 @@ flowchart LR
     class OUT_DATA,OUT_SUM out
 ```
 
-### Connector protocol
+### Connector interface
+
+Connectors are duck-typed — any class implementing these two methods works:
 
 ```python
-class ConnectorProtocol(Protocol):
-    def discover(self, job) -> DiscoveryResult: ...
-    def materialize(self, job, conn: duckdb.DuckDBPyConnection) -> None: ...
+def discover(self, job: JobConfig) -> DiscoveryResult: ...
+def materialize(self, job: JobConfig, conn: duckdb.DuckDBPyConnection) -> None: ...
 ```
 
 `runner.py` calls both methods for every enabled job.
@@ -318,7 +317,7 @@ outputs/
 └── population_latam_summary.json
 ```
 
-Each `_summary.json` records job name, status, start/end time,
+Each `_summary.json` records job id, status, start/end time,
 duration, row count, export path, discovery columns, and any error message.
 
 ---
@@ -329,7 +328,7 @@ duration, row count, export path, discovery columns, and any error message.
 pytest tests/ -v
 ```
 
-37 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
+36 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
 accepts an injected `session` argument, and tests pass a `FakeSession`
 that returns pre-defined page payloads.
 

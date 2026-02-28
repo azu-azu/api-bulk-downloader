@@ -34,7 +34,7 @@ def test_load_valid_manifest(tmp_manifest):
     assert cfg.jobs[0].export.format == "csv"  # default
 
 
-def test_duplicate_name_raises(tmp_manifest):
+def test_duplicate_id_raises(tmp_manifest):
     yaml_jobs = _wb_job("gdp_jpn") + _wb_job("gdp_jpn")
     path = tmp_manifest(yaml_jobs)
     with pytest.raises(ManifestValidationError, match="Duplicate job id"):

@@ -90,7 +90,7 @@ cli.py      ← pipelines/ をループ（run-all の場合）
 
 **対象パス:**
 - export: `output_root / {filename}.{ext}`
-- summary: `output_root / {job_name}_summary.json`
+- summary: `output_root / {job_id}_summary.json`
 
 **判断:** 衝突があれば **実行前に** エラーにする（fail fast）。`--allow-overwrite` で無効化できる。
 
@@ -103,17 +103,18 @@ cli.py      ← pipelines/ をループ（run-all の場合）
 
 ## 6. Connector-agnostic コア
 
+Connector は duck-typing で定義する。以下の2メソッドを持つクラスであれば動作する。
+
 ```python
-class ConnectorProtocol(Protocol):
-    def discover(self, job) -> DiscoveryResult: ...
-    def materialize(self, job, conn: duckdb.DuckDBPyConnection) -> None: ...
+def discover(self, job: JobConfig) -> DiscoveryResult: ...
+def materialize(self, job: JobConfig, conn: duckdb.DuckDBPyConnection) -> None: ...
 ```
 
-**判断:** データ取得の実装を connector に隔離し、`runner.py` はプロトコルだけを知る。
+**判断:** データ取得の実装を connector に隔離し、`runner.py` はインターフェースだけを知る。
+`connector_params` は manifest から `**kwargs` でコンストラクタに渡す。
 
 **理由:**
 - 新しいデータソース（Salesforce、BigQuery 等）を追加するとき、`runner.py` を変更しない
-- `_REGISTRY` に1行追加するだけでコアに接続できる
 - テストでは `FakeSession` を注入して HTTP を完全に排除できる
 
 **`discover()` と `materialize()` の分離:**
