@@ -11,7 +11,7 @@ from src.exceptions import ManifestValidationError
 
 logger = logging.getLogger(__name__)
 
-_KNOWN_TYPES = {"worldbank_indicator", "salesforce_report"}
+_KNOWN_TYPES = {"worldbank_indicator"}
 _KNOWN_FORMATS = {"csv", "parquet"}
 
 
