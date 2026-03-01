@@ -326,7 +326,7 @@ flowchart LR
 
 
     %% NEW: TUI branch
-    TUI["<u><b><big>tui_gui.py</big></u></b><br><br>設定の一覧表示<br>編集・更新"]
+    TUI["<u><b><big>tui.py</big></u></b><br><br>設定の一覧表示<br>編集・更新"]
 
 
     %% inputs (auxiliary)
@@ -366,13 +366,14 @@ flowchart LR
 
     %% main flow
     TUI <-.-> PRE
-
-    CLI --- MANI
+    CLI -->|"読み込み"|MANI
+    CLI ---|"Manifest<br>読み込み後"| SECOND(( ))
+    SECOND -->|"list"| TUI
+    SECOND -->|"run/run-all"| RUN_PIPE
 
     MF -.->|"load"| MANI
     MANI -.->|"schema.file"| SCH
     MANI -.->|"sql.file"| SQL_FILE
-    MANI -->|"ManifestConfig"| RUN_PIPE
 
     %% per-job flow
     RUN_PIPE --- RUN_CONN

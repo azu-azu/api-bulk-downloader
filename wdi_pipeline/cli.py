@@ -90,6 +90,7 @@ def _require_manifest(args_value: str | None) -> str | None:
     return val
 
 
+# ディレクトリ確定
 def _require_pipeline_dir(args_value: str | None) -> str | None:
     """Return resolved pipeline dir string, or None (error printed) if missing."""
     val = args_value or os.environ.get("WDI_PIPELINE_DIR")
@@ -102,6 +103,7 @@ def _require_pipeline_dir(args_value: str | None) -> str | None:
     return val
 
 
+# argparse でサブコマンドを解析
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="wdi-pipeline",
@@ -212,9 +214,11 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# -- メイン実行 --
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
 
+    # 解析
     parser = _build_parser()
     args = parser.parse_args(argv)
 
@@ -245,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
-    # 複数パイプライン一括実行
+    # 配下の複数manifestをまとめて実行
     elif args.command == "run-all":
         setup_logging(args.log_level)
         # Resolve pipeline dir: CLI > env > error
@@ -254,12 +258,14 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         pipeline_dir = Path(pipeline_dir_str)
-        manifests = sorted(pipeline_dir.glob("*/manifest.yaml")) # manifest を列挙
+
+        # manifest を列挙
+        manifests = sorted(pipeline_dir.glob("*/manifest.yaml"))
         if not manifests:
             print(f"No manifest.yaml found under '{pipeline_dir}'.", file=sys.stderr)
             return 1
 
-        # いったん全部ロードする（preflightのため）
+        # preflightのために一回全部ロード
         loaded = []
         for manifest_path in manifests:
             manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
@@ -267,8 +273,7 @@ def main(argv: list[str] | None = None) -> int:
                 manifest.output_root = Path(args.output_root)
             loaded.append((manifest_path, manifest))
 
-        # Preflight collision check (skip only if --allow-overwrite)
-        # ファイル名が被るかどうかのチェック
+        # -- Preflight collision check (skip only if --allow-overwrite) --
         # Runs even in --dry-run / --probe mode so config errors are caught early.
         #
         # Naming spec (confirmed from source):
@@ -276,6 +281,9 @@ def main(argv: list[str] | None = None) -> int:
         #   summary: output_root / f"{job.job_id}_summary.json"       (summary.py)
         #
         # Both paths are checked independently.
+
+        # ファイル名が被るかどうかのチェック
+        # --allow-overwrite が無い場合だけ実行
         if not args.allow_overwrite:
             seen: dict[str, str] = {}  # resolved dest path → "pipeline/job (export|summary)"
             collisions: list[str] = []
@@ -286,6 +294,8 @@ def main(argv: list[str] | None = None) -> int:
                     root = manifest.output_root
                     key = f"{manifest_path.parent.name}/{job.job_id}"
                     ext = job.export.format
+
+                    # 2種類チェック
                     export_dest = str((root / f"{job.export.filename}.{ext}").resolve())
                     summary_dest = str((root / f"{job.job_id}_summary.json").resolve())
                     for dest, kind in ((export_dest, "export"), (summary_dest, "summary")):

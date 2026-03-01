@@ -139,9 +139,9 @@ class WorldBankIndicatorConnector:
         return meta, data
 
     # JSONを、DuckDBの行に変換
-    # NOTE: This method is hardcoded to produce exactly the 6 columns defined in
-    # timeseries.yaml (country_code, country_name, indicator_code, indicator_name,
-    # year, value). Any schema change in the YAML requires a matching update here.
+    # Returns a fixed 6-column structure: country_code, country_name, indicator_code,
+    # indicator_name, year, value. The job's schema.columns must declare these same
+    # 6 columns in this order.
     def _normalize(self, data: list[dict[str, Any]]) -> list[list[str | int | float | None]]:
         rows = []
         for item in data:
