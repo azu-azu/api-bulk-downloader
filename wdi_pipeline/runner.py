@@ -52,6 +52,7 @@ def run_pipeline(
     output_root = manifest.output_root
     summaries: list[JobSummary] = []
 
+    # manifest.jobs を回す
     for job in jobs:
         summary = _run_job(job, output_root, dry_run=dry_run, probe=probe)
         summary.write(output_root)
@@ -82,7 +83,6 @@ def _run_job(
 
     # コネクタ生成
     connector = _build_connector(job)
-
     try:
         # discover() is always called (no network required for worldbank)
         # 列情報などのメタ探索
