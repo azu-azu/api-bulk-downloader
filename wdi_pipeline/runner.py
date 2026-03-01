@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +61,6 @@ def _run_job(
     probe: bool,
 ) -> JobSummary:
     summary = make_summary(job.job_id)
-    t0 = time.monotonic()
     logger.info("=== Job: %s ===", job.job_id)
 
     if dry_run:
@@ -93,9 +91,9 @@ def _run_job(
             logger.info("  materialize done")
 
             sql_text = job.sql.file.read_text()
-            rendered_sql, _ = render(sql_text, job.sql.params)
+            rendered_sql = render(sql_text, job.sql.params)
 
-            ext = "csv" if job.export.format == "csv" else "parquet"
+            ext = job.export.format
             dest = (output_root / f"{job.export.filename}.{ext}").resolve()
 
             logger.info("  export …")
@@ -103,14 +101,13 @@ def _run_job(
         finally:
             conn.close()
 
-        elapsed = time.monotonic() - t0
         summary.status = "success"
         summary.finish(
             rows=rows,
             export_path=dest,
             discovery_columns=discovery.columns,
         )
-        logger.info("Job '%s' done — %d rows → %s  (%.2f s)", job.job_id, rows, dest, elapsed)
+        logger.info("Job '%s' done — %d rows → %s  (%.2f s)", job.job_id, rows, dest, summary.duration_seconds)
 
     except PipelineError as exc:
         logger.error("Job '%s' failed: %s", job.job_id, exc)

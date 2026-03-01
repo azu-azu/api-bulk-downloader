@@ -7,14 +7,11 @@ from wdi_pipeline.exceptions import SQLTemplateError
 _PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 
 
-def render(sql: str, params: dict[str, str]) -> tuple[str, list]:
+def render(sql: str, params: dict[str, str]) -> str:
     """Replace {{key}} placeholders with SQL literal values.
 
     Integer/float strings are embedded as bare numeric literals.
     Other strings are embedded as single-quoted SQL strings (apostrophes escaped).
-
-    Returns:
-        (rendered_sql, []) — the list is always empty; values are inlined as literals.
 
     Raises:
         SQLTemplateError: if any {{key}} in `sql` is not present in `params`.
@@ -31,8 +28,7 @@ def render(sql: str, params: dict[str, str]) -> tuple[str, list]:
             )
         return _to_sql_literal(params[key])
 
-    rendered = _PLACEHOLDER.sub(_replace, sql)
-    return rendered, []
+    return _PLACEHOLDER.sub(_replace, sql)
 
 
 def _to_sql_literal(val: str) -> str:

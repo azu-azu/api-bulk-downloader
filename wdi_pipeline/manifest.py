@@ -1,6 +1,22 @@
+"""a validated parser
+manifest.yaml（設定ファイル）を読み込んで、
+型付きの ManifestConfig / JobConfig に変換しつつ、
+エラーを早期に出す“バリデーション付きパーサ
+
+This is a validated parser that loads manifest.yaml,
+converts it into typed dataclasses,
+and fails fast with clear errors.
+
+全体像
+YAML（文字列の設定）を読む
+期待する形（dict/list/必須キー）か検証する
+SQLファイルとschemaファイルのパスを解決して存在確認する
+JobConfig という “実行可能な構造体” に変換する
+enabled: true のジョブだけ取り出せるようにもする
+"""
+
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -9,11 +25,9 @@ import yaml
 
 from wdi_pipeline.exceptions import ManifestValidationError
 
-logger = logging.getLogger(__name__)
-
 _KNOWN_FORMATS = {"csv", "parquet"}
 
-
+# YAMLを “ただのdict” で持ち回すとキー間違いのリスクがあるため、型付きの箱（dataclass） に詰め替える。
 @dataclass
 class ColumnDef:
     name: str
@@ -51,6 +65,7 @@ class JobConfig:
 class ManifestConfig:
     output_root: Path
     jobs: list[JobConfig]
+    default_format: str = "csv"
 
     def enabled_jobs(self) -> list[JobConfig]:
         return [j for j in self.jobs if j.enabled]
@@ -62,23 +77,30 @@ def load_manifest(manifest_path: str | Path, base_dir: Path | None = None) -> Ma
     Args:
         manifest_path: Path to the manifest YAML file.
         base_dir: Base directory for resolving relative SQL file paths.
-                  Defaults to the manifest file's parent directory.
+                Defaults to the manifest file's parent directory.
     """
+    # パス検証
     path = Path(manifest_path)
     if not path.exists():
         raise ManifestValidationError(f"Manifest file not found: {path}")
 
+    # YAML読み込み
     with path.open() as fh:
         raw = yaml.safe_load(fh)
 
+    # “manifestはdictであるべき” を検証
     if not isinstance(raw, dict):
         raise ManifestValidationError("Manifest must be a YAML mapping.")
 
+    # base_dir の決定/SQLやschemaの相対パスを manifestの場所基準で解決するため
     base_dir = base_dir or path.parent
+
+    # defaults 読み込み
     defaults = raw.get("defaults", {})
     output_root = Path(defaults.get("output_root", "outputs/"))
     default_format = defaults.get("export_format", "csv").lower()
 
+    # jobs の検証 + ループ/jobs は必ず list
     raw_jobs = raw.get("jobs", [])
     if not isinstance(raw_jobs, list):
         raise ManifestValidationError("'jobs' must be a list.")
@@ -87,7 +109,9 @@ def load_manifest(manifest_path: str | Path, base_dir: Path | None = None) -> Ma
     seen_ids: set[str] = set()
 
     for i, raw_job in enumerate(raw_jobs):
-        job = _parse_job(raw_job, i, base_dir, default_format)
+        job = _parse_job(raw_job, i, base_dir, default_format) # 1個ずつパース
+
+        # job_id の重複を禁止
         if job.job_id in seen_ids:
             raise ManifestValidationError(
                 f"Duplicate job id: '{job.job_id}'"
@@ -98,27 +122,32 @@ def load_manifest(manifest_path: str | Path, base_dir: Path | None = None) -> Ma
     return ManifestConfig(
         output_root=output_root,
         jobs=jobs,
+        default_format=default_format,
     )
 
 
 def _parse_job(
     raw: Any, idx: int, base_dir: Path, default_format: str
 ) -> JobConfig:
+
+    # job が dict か？
     if not isinstance(raw, dict):
         raise ManifestValidationError(f"Job at index {idx} must be a mapping.")
 
+    # job_id 必須
     job_id = raw.get("job_id")
     if not job_id:
         raise ManifestValidationError(f"Job at index {idx} is missing 'job_id'.")
 
+    # enabled（デフォルト True）
     enabled = raw.get("enabled", True)
 
-    # connector_params
+    # connector_params（無ければ {}）
     raw_connector_params = raw.get("connector_params") or {}
     if not isinstance(raw_connector_params, dict):
         raise ManifestValidationError(f"Job '{job_id}': 'connector_params' must be a mapping.")
 
-    # sql
+    # sql（必須、file 必須、存在チェック）
     raw_sql = raw.get("sql")
     if not isinstance(raw_sql, dict):
         raise ManifestValidationError(f"Job '{job_id}': 'sql' must be a mapping.")
@@ -133,7 +162,7 @@ def _parse_job(
     sql_params = raw_sql.get("params") or {}
     sql_cfg = SqlConfig(file=sql_file, params={k: str(v) for k, v in sql_params.items()})
 
-    # export
+    # export（任意、format検証、filenameはjob_idにフォールバック）
     raw_export = raw.get("export") or {}
     fmt = raw_export.get("format", default_format).lower()
     if fmt not in _KNOWN_FORMATS:
@@ -144,7 +173,7 @@ def _parse_job(
     filename = raw_export.get("filename") or job_id
     export_cfg = ExportConfig(filename=filename, format=fmt)
 
-    # schema
+    # schema（必須、file必須、存在チェック、内容検証）
     raw_schema = raw.get("schema")
     if not isinstance(raw_schema, dict):
         raise ManifestValidationError(f"Job '{job_id}': 'schema' must be a mapping.")
