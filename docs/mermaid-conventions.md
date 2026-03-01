@@ -30,45 +30,63 @@ flowchart LR
 
 ### 3-a. 処理ノード（四角）
 
+**ファイル名が明確なモジュールノード：**
+
 ```
-"役割名<br>-----<br><br><u><b>module.py</b></u><br>function()<br>一行説明"
+"<u><b><big>module.py</big></u></b><br>function()<br><br>-----<br><br>一行説明"
 ```
 
 | 行 | 内容 | ルール |
 |----|------|--------|
-| 1 | 役割名（英語・名詞句） | `Data Fetch`, `SQL Render`, `Export` など |
-| 2 | 区切り線 | `-----` 固定 |
-| 3 | 空行 | `<br>` のみ |
-| 4 | ファイル名 | `<u><b>module.py</b></u>` |
-| 5 | 関数・メソッド名 | `run()`, `execute()` など |
-| 6 | 短い説明 | 日本語可 |
+| 1 | ファイル名 | `<u><b><big>module.py</big></u></b>` |
+| 2 | 関数・メソッド名 | `run()`, `execute()` など |
+| 3 | 空行 + 区切り線 + 空行 | `<br><br>-----<br><br>` |
+| 4 | 短い説明 | 日本語可 |
 
 **例（汎用）:**
 ```
-PROC["Data Process<br>-----<br><br><u><b>processor.py</b></u><br>run()<br>入力を変換して出力"]
+PROC["<u><b><big>processor.py</big></u></b><br>run()<br><br>-----<br><br>入力を変換して出力"]
+```
+
+**サブグラフ内などファイル名を省略するメソッドノード：**
+
+```
+"<i>役割名</i><br><br>function()<br><br>-----<br><br>一行説明"
+```
+
+| 行 | 内容 | ルール |
+|----|------|--------|
+| 1 | 役割名（イタリック・英語） | `<i>Data Fetch</i>`, `<i>Schema Discovery</i>` など |
+| 2 | 空行 + 関数・メソッド名 | `<br><br>materialize()` など |
+| 3 | 空行 + 区切り線 + 空行 | `<br><br>-----<br><br>` |
+| 4 | 短い説明 | 日本語可 |
+
+**例（汎用）:**
+```
+MAT["<i>Data Fetch</i><br><br>materialize()<br><br>-----<br><br>テーブル作成"]
 ```
 
 ### 3-b. ファイル・外部リソースノード（台形）
 
 ```
-[/"<u><b>名前またはパス</b></u><br>一行説明"/]
+[/"<u><b><big>名前またはパス</big></u></b><br>一行説明"/]
 ```
 
 **例（汎用）:**
 ```
-CFG[/"<u><b>config.yaml</b></u><br>設定ファイル"/]
-API[/"<u><b>External API</b></u><br>REST · リトライあり"/]
+CFG[/"<u><b><big>config.yaml</big></u></b><br>設定ファイル"/]
+API[/"<u><b><big>External API</big></u></b><br>REST · リトライあり"/]
 ```
 
 ### 3-c. DB ノード（シリンダー）
 
 ```
-[("テーブル名<br>-----<br>col1 · col2<br>col3 · col4")]
+[("補足（メモリ上など）<br><u><b><big>TABLE name</big></u></b><br>-----<br>col1 · col2<br>col3 · col4")]
 ```
 
 **例（汎用）:**
 ```
-TBL[("TABLE records<br>-----<br>id · name<br>created_at · value")]
+TBL[("（メモリ上）<br><u><b><big>TABLE records</big></u></b><br>-----<br>id · name<br>created_at · value")]
 ```
 
 ### 3-d. 終端ノード（角丸）
@@ -184,24 +202,24 @@ end
 
 ```mermaid
 flowchart LR
-    ENTRY["Entry Point<br>-----<br><br><u><b>main.py</b></u><br>main()"]
+    ENTRY["<u><b><big>main.py</big></u></b><br>main()<br><br>-----<br><br>エントリポイント"]
 
     %% inputs (auxiliary)
     subgraph PRE ["事前設定"]
-        CFG[/"<u><b>config.yaml</b></u><br>設定ファイル"/]
+        CFG[/"<u><b><big>config.yaml</big></u></b><br>設定ファイル"/]
     end
     CFG -.->|"load"| ENTRY
 
     %% runtime flow
     ENTRY -->|"skip"| SKIP(["⏭ skipped"])
-    ENTRY --> PROC["Process<br>-----<br><br><u><b>processor.py</b></u><br>run()<br>処理の説明"]
+    ENTRY --> PROC["<u><b><big>processor.py</big></u></b><br>run()<br><br>-----<br><br>処理の説明"]
 
-    PROC <-->|"request / response"| EXT[/"<u><b>External API</b></u><br>プロトコル・認証方式"/]
-    PROC -->|"write"| TBL[("TABLE name<br>-----<br>col1 · col2<br>col3 · col4")]
+    PROC <-->|"request / response"| EXT[/"<u><b><big>External API</big></u></b><br>プロトコル・認証方式"/]
+    PROC -->|"write"| TBL[("（メモリ上）<br><u><b><big>TABLE name</big></u></b><br>-----<br>col1 · col2<br>col3 · col4")]
 
     %% outputs
-    TBL --> EXPORT["Export<br>-----<br><br><u><b>exporter.py</b></u><br>export()<br>出力形式の説明"]
-    EXPORT --> OUT[/"<u><b>outputs/</b></u><br>*.csv / *.parquet"/]
+    TBL --> EXPORT["<u><b><big>exporter.py</big></u></b><br>export()<br><br>-----<br><br>出力形式の説明"]
+    EXPORT --> OUT[/"<u><b><big>outputs/</big></u></b><br>*.csv / *.parquet"/]
 
     classDef entry fill:#e0f7fa,stroke:#0097a7,color:#000
     classDef file  fill:#e8f0fe,stroke:#4a7fcb,color:#000

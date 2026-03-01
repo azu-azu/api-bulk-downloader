@@ -320,32 +320,32 @@ flowchart LR
 
     %% inputs (auxiliary)
     subgraph PRE ["<u><b>pipelines/*/</b></u><br>（事前設定）"]
-        MF[/"<u><b>manifest.yaml</b></u><br>job定義<br><br>1 job = 1 CSV出力"/]
-        SCH[/"<u><b>schemas/timeseries.yaml</b></u><br>列定義 (name · type)"/]
-        SQL_FILE[/"<u><b>queries/timeseries.sql</b></u><br>SQL テンプレ"/]
+        MF[/"<u><b><big>manifest.yaml</big></u></b><br>job定義<br><br>1 job = 1 CSV出力"/]
+        SCH[/"<u><b><big>schemas/timeseries.yaml</big></u></b><br>列定義 (name · type)"/]
+        SQL_FILE[/"<u><b><big>queries/timeseries.sql</big></u></b><br>SQL テンプレ"/]
     end
 
     SKIP(["⏭ skipped"])
 
     subgraph CONN ["<u><b>connectors/(source name)</b></u>"]
-        DISC["Schema Discovery<br>-----<br><br>discover()<br>job.schema から列名取得"]
-        MAT["Data Fetch<br>-----<br><br>materialize()<br>テーブル作成"]
+        DISC["<i>Schema Discovery</i><br><br>discover()<br><br>-----<br><br>job.schema から列名取得"]
+        MAT["<i>Data Fetch</i><br><br>materialize()<br><br>-----<br><br>テーブル作成"]
     end
 
     PROBED(["⏭ probe 完了<br>列名確認のみ"])
 
-    WB[/"<u><b>World Bank Indicator API</b></u><br>JSON ページング · urllib3.Retry"/]
+    WB[/"<u><b><big>World Bank Indicator API</big></u></b><br>JSON ページング · urllib3.Retry"/]
 
-    DS[("（メモリ上）<br>TABLE dataset<br>-----<br><br>（例）<br>country_code<br>country_name<br>indicator_code<br>indicator_name<br>year<br>value")]
+    DS[("（メモリ上）<br><u><b><big>TABLE dataset</big></u></b><br>-----<br><br>（例）<br>country_code<br>country_name<br>indicator_code<br>indicator_name<br>year<br>value")]
 
-    RENDER["SQL Render<br>-----<br><br><u><b>sql_template.py</b></u><br>render()<br>{{key}} → SQL リテラル"]
+    RENDER["<u><b><big>sql_template.py</big></u></b><br>render()<br><br>-----<br><br>{{key}} → SQL リテラル"]
 
-    EXPORT["Export<br>-----<br><br><u><b>exporter.py</b></u><br>export()<br>SQL実行・ファイル生成"]
+    EXPORT["<u><b><big>exporter.py</big></u></b><br>export()<br><br>-----<br><br>SQL実行・ファイル生成"]
 
-    SUM["Summary<br>-----<br><br><u><b>summary.py</b></u><br>write()<br>ジョブ結果を JSON 出力"]
+    SUM["<u><b><big>summary.py</big></u></b><br>write()<br><br>-----<br><br>ジョブ結果を JSON 出力"]
 
-    OUT_DATA[/"<u><b>outputs/</b></u><br>*.csv / *.parquet"/]
-    OUT_SUM[/"<u><b>outputs/</b></u><br>*_summary.json"/]
+    OUT_DATA[/"<u><b><big>outputs/</big></u></b><br>*.csv / *.parquet"/]
+    OUT_SUM[/"<u><b><big>outputs/</big></u></b><br>*_summary.json"/]
 
     %% main flow
     CLI --> MAN

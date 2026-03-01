@@ -1,3 +1,7 @@
+"""実行エンジン
+「manifestで有効なjobを順番に回して、各jobを discover → materialize → export する」
+"""
+
 from __future__ import annotations
 
 import logging
@@ -15,7 +19,6 @@ from wdi_pipeline.summary import JobSummary, make_summary
 
 logger = logging.getLogger(__name__)
 
-
 def run_pipeline(
     manifest: ManifestConfig,
     *,
@@ -24,6 +27,11 @@ def run_pipeline(
     only: str | None = None,
 ) -> list[JobSummary]:
     """Execute the pipeline for all enabled jobs (or a single named job).
+
+    manifest.enabled_jobs() で 実行対象job を取り出す
+    only があれば job_id一致の1件だけ に絞る（見つからなければ PipelineError）
+    for job in jobs: で 順番に _run_job() を呼ぶ
+    返ってきた summary を summary.write(output_root) で サマリ保存して、配列で返す
 
     Args:
         manifest: Parsed and validated ManifestConfig.
@@ -34,6 +42,7 @@ def run_pipeline(
     Returns:
         List of JobSummary objects, one per processed job.
     """
+    # 実行jobの選別フィルタ
     jobs = manifest.enabled_jobs()
     if only:
         jobs = [j for j in jobs if j.job_id == only]
@@ -52,7 +61,7 @@ def run_pipeline(
 
     return summaries
 
-
+# 1ジョブ分の全部を担当する
 def _run_job(
     job: JobConfig,
     output_root: Path,
