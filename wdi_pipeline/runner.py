@@ -69,47 +69,62 @@ def _run_job(
     dry_run: bool,
     probe: bool,
 ) -> JobSummary:
+
+    # 記録箱（JobSummary）を作る
     summary = make_summary(job.job_id)
     logger.info("=== Job: %s ===", job.job_id)
 
+    # dry_run なら ネットワークもexportもやらずに即終了（status=skipped）
+    # 流れを確認するだけのモード
     if dry_run:
         logger.info("[dry-run] Skipping job '%s' — no network calls.", job.job_id)
         summary.status = "skipped"
         summary.finish()
         return summary
 
+    # コネクタ生成
     connector = _build_connector(job)
 
     try:
         # discover() is always called (no network required for worldbank)
+        # 列情報などのメタ探索
         logger.info("  discover …")
         discovery = connector.discover(job)
         logger.info("  discover done: %d columns", len(discovery.columns))
 
+        # probe なら discoverだけで終了（status=probed）
+        # schema/列が想定どおりかの確認、接続や設定の確認モード
         if probe:
             logger.info("[probe] Job '%s' — discover complete, skipping materialize.", job.job_id)
             summary.status = "probed"
             summary.finish(discovery_columns=discovery.columns)
             return summary
 
-        # Full execution
+        # -- Full execution --
         conn = duckdb.connect()
         try:
+            # データをDuckDB内にテーブルとして作る/投入する
             logger.info("  materialize …")
             connector.materialize(job, conn)
             logger.info("  materialize done")
 
+            # SQLテンプレ読み込み → render() でパラメータ反映
+            # job.sql.file: from manifest
             sql_text = job.sql.file.read_text()
             rendered_sql = render(sql_text, job.sql.params)
 
+            # output path
             ext = job.export.format
             dest = (output_root / f"{job.export.filename}.{ext}").resolve()
 
+            # SQL結果をファイルに書き出す
             logger.info("  export …")
             rows = export(conn, rendered_sql, dest, job.export.format)
         finally:
             conn.close()
+        # -- Full execution --
 
+        # summaryに結果（rows, export_path, columns, duration）を書いてログ出して終わり
         summary.status = "success"
         summary.finish(
             rows=rows,
@@ -118,6 +133,7 @@ def _run_job(
         )
         logger.info("Job '%s' done — %d rows → %s  (%.2f s)", job.job_id, rows, dest, summary.duration_seconds)
 
+    # 例外
     except PipelineError as exc:
         logger.error("Job '%s' failed: %s", job.job_id, exc)
         summary.status = "failed"
