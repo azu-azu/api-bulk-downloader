@@ -30,12 +30,12 @@ class JobSummary:
         error: str | None = None,
     ) -> None:
         self.finished_at = _now_iso()
-        if self.started_at:
-            started = datetime.fromisoformat(self.started_at)
-            finished = datetime.fromisoformat(self.finished_at)
-            self.duration_seconds = round(
-                (finished - started).total_seconds(), 3
-            )
+        assert self.started_at is not None, "finish() called before started_at was set"
+        started = datetime.fromisoformat(self.started_at)
+        finished = datetime.fromisoformat(self.finished_at)
+        self.duration_seconds = round(
+            (finished - started).total_seconds(), 3
+        )
         if rows is not None:
             self.rows_exported = rows
         if export_path is not None:

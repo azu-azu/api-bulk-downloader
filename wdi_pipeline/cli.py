@@ -1,5 +1,10 @@
 """CLI entry point for the batch data pipeline.
 
+司令塔CLI
+run / run-all / list / gui の4コマンドを argparse で受けて、
+.env を読んで、manifest.yaml をロードして、runner.run_pipeline() を呼ぶ。
+run-all のときだけ 出力先の衝突（上書き事故）を事前検知して止める
+
 Usage:
     wdi-pipeline run     [--manifest PATH] [--output-root PATH] [--dry-run] [--probe] [--only JOB_ID]
     wdi-pipeline run-all [--pipeline-dir PATH] [--output-root PATH] [--dry-run] [--probe]

@@ -59,7 +59,7 @@ def test_export_with_rendered_literal_filter(tmp_path: Path):
     from wdi_pipeline.sql_template import render
     conn = _conn_with_dataset([("JPN", 2020, 1.0), ("USA", 2021, 2.0)])
     dest = tmp_path / "out.csv"
-    sql, _ = render(
+    sql = render(
         "SELECT * FROM dataset WHERE year >= {{min_year}}",
         {"min_year": "2021"},
     )

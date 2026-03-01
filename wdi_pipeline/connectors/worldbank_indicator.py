@@ -63,7 +63,8 @@ class WorldBankIndicatorConnector:
 
         # INSERT文を準備
         # ? は DuckDB Python のパラメータプレースホルダ/列数ぶん ?, ?, ?, ... を生成
-        placeholders = ", ".join(["?"] * len(job.schema.columns))
+        expected_cols = len(job.schema.columns)
+        placeholders = ", ".join(["?"] * expected_cols)
         insert_sql = f"INSERT INTO dataset VALUES ({placeholders})"
 
         # ページを1から回す
@@ -75,6 +76,11 @@ class WorldBankIndicatorConnector:
                 logger.debug("Page %d returned empty data — stopping.", page)
                 break
             rows = self._normalize(data) # JSON→行配列に変換
+            if rows and len(rows[0]) != expected_cols:
+                raise ConnectorError(
+                    f"_normalize() returned {len(rows[0])} columns but schema has "
+                    f"{expected_cols}. Update _normalize() to match the schema."
+                )
             conn.executemany(insert_sql, rows) # 一括INSERT
             total_rows += len(rows)
             pages = int(meta.get("pages", 1)) # 最終ページまで回す

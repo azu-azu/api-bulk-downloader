@@ -33,7 +33,7 @@ def export(
     fmt_upper = fmt.upper()
 
     try:
-        # render() embeds literal values, so no bind params are needed here.
+        # sql is pre-rendered by render() in runner.py (literals inlined); no bind params needed.
         conn.execute(f"CREATE OR REPLACE TEMP VIEW _export AS {sql}")
         row_count: int = conn.execute(
             "SELECT COUNT(*) FROM _export"

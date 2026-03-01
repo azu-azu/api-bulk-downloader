@@ -76,7 +76,7 @@ class EditJobScreen(ModalScreen):
         job = self._job
         indicator_code = job.connector_params.get("indicator_code", "")
         country_code = job.connector_params.get("country_code", "")
-        current_format = job.export.format or self._default_format
+        current_format = job.export.format
 
         with Vertical(id="dialog"):
             yield Label(f"Edit: {job.job_id}", id="dialog-title")
@@ -123,11 +123,7 @@ class EditJobScreen(ModalScreen):
         result["country_code"] = self.query_one("#field-country_code", Input).value
         result["filename"] = self.query_one("#field-filename", Input).value
 
-        fmt_widget = self.query_one("#field-format", Select)
-        fmt_value = fmt_widget.value
-        result["format"] = (
-            str(fmt_value) if isinstance(fmt_value, str) else self._default_format
-        )
+        result["format"] = self.query_one("#field-format", Select).value
 
         params: dict[str, str] = {}
         for key in self._job.sql.params:
@@ -188,12 +184,9 @@ class PipelineApp(App):
         for manifest_path in manifest_paths:
             try:
                 manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
-                with manifest_path.open() as fh:
-                    raw = yaml.safe_load(fh)
-                default_format = raw.get("defaults", {}).get("export_format", "csv")
                 for job in manifest.jobs:
                     self._rows.append(
-                        (manifest_path, job, default_format, str(manifest.output_root))
+                        (manifest_path, job, manifest.default_format, str(manifest.output_root))
                     )
             except Exception as exc:
                 self.notify(f"Error loading {manifest_path.name}: {exc}", severity="error")
