@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from wdi_pipeline.exceptions import PipelineError
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +38,8 @@ class JobSummary:
         error: str | None = None,
     ) -> None:
         self.finished_at = _now_iso()
-        assert self.started_at is not None, "finish() called before started_at was set"
+        if self.started_at is None:
+            raise PipelineError("finish() called before started_at was set")
         started = datetime.fromisoformat(self.started_at)
         finished = datetime.fromisoformat(self.finished_at)
         self.duration_seconds = round(

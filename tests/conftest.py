@@ -11,6 +11,14 @@ import pytest
 # FakeSession — injected into WorldBankIndicatorConnector in tests
 # ---------------------------------------------------------------------------
 
+def make_page(page: int, pages: int, data: list[dict]) -> list:
+    """Build a WorldBank-style API response envelope for testing."""
+    return [
+        {"page": page, "pages": pages, "per_page": 5000, "total": pages * len(data)},
+        data,
+    ]
+
+
 class FakeSession:
     """Deterministic HTTP session that cycles through pre-defined page payloads."""
 

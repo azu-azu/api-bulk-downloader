@@ -1,6 +1,6 @@
 """TUI dashboard for wdi-pipeline jobs.
 
-“ジョブ一覧＋編集” のTUI(Text-based UI)
+"ジョブ一覧＋編集" のTUI(Text-based UI)
 manifest.yaml を全部読んで、テーブルで表示して、
 選んだジョブを Enable切替 or 編集してYAMLに保存する
 
@@ -167,7 +167,7 @@ class PipelineApp(App):
         # Each entry: (manifest_path, job, output_root_str)
         self._rows: list[tuple[Path, JobConfig, str]] = []
 
-    # UI部品を “宣言的に並べる” 場所。
+    # UI部品を "宣言的に並べる" 場所。
     def compose(self) -> ComposeResult:
         yield Header()
         yield DataTable(id="job-table")
@@ -210,31 +210,34 @@ class PipelineApp(App):
 
     def _save_job(self, manifest_path: Path, job_id: str, values: dict[str, Any]) -> None:
         """Write edited values back to manifest YAML."""
-        raw = yaml.safe_load(manifest_path.read_text())
-        for raw_job in raw.get("jobs", []):
-            if raw_job.get("job_id") == job_id:
-                raw_job["enabled"] = values["enabled"]
+        try:
+            raw = yaml.safe_load(manifest_path.read_text())
+            for raw_job in raw.get("jobs", []):
+                if raw_job.get("job_id") == job_id:
+                    raw_job["enabled"] = values["enabled"]
 
-                if "connector_params" not in raw_job:
-                    raw_job["connector_params"] = {}
-                raw_job["connector_params"]["indicator_code"] = values["indicator_code"]
-                raw_job["connector_params"]["country_code"] = values["country_code"]
+                    if "connector_params" not in raw_job:
+                        raw_job["connector_params"] = {}
+                    raw_job["connector_params"]["indicator_code"] = values["indicator_code"]
+                    raw_job["connector_params"]["country_code"] = values["country_code"]
 
-                if "export" not in raw_job:
-                    raw_job["export"] = {}
-                raw_job["export"]["filename"] = values["filename"]
-                raw_job["export"]["format"] = values["format"]
+                    if "export" not in raw_job:
+                        raw_job["export"] = {}
+                    raw_job["export"]["filename"] = values["filename"]
+                    raw_job["export"]["format"] = values["format"]
 
-                if "sql" not in raw_job:
-                    raw_job["sql"] = {}
-                if "params" not in raw_job["sql"]:
-                    raw_job["sql"]["params"] = {}
-                for k, v in values["sql_params"].items():
-                    raw_job["sql"]["params"][k] = v
+                    if "sql" not in raw_job:
+                        raw_job["sql"] = {}
+                    if "params" not in raw_job["sql"]:
+                        raw_job["sql"]["params"] = {}
+                    for k, v in values["sql_params"].items():
+                        raw_job["sql"]["params"][k] = v
 
-                break
+                    break
 
-        manifest_path.write_text(yaml.dump(raw, allow_unicode=True, sort_keys=False))
+            manifest_path.write_text(yaml.dump(raw, allow_unicode=True, sort_keys=False))
+        except Exception as exc:
+            self.notify(f"Failed to save {manifest_path.name}: {exc}", severity="error")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         table = self.query_one("#job-table", DataTable)
@@ -246,15 +249,19 @@ class PipelineApp(App):
         manifest_path, job, _ = self._rows[cursor_row]
 
         if event.button.id == "btn-toggle":
-            job.enabled = not job.enabled
+            new_enabled = not job.enabled
+            try:
+                raw = yaml.safe_load(manifest_path.read_text())
+                for raw_job in raw.get("jobs", []):
+                    if raw_job.get("job_id") == job.job_id:
+                        raw_job["enabled"] = new_enabled
+                        break
+                manifest_path.write_text(yaml.dump(raw, allow_unicode=True, sort_keys=False))
+            except Exception as exc:
+                self.notify(f"Failed to update {manifest_path.name}: {exc}", severity="error")
+                return
 
-            raw = yaml.safe_load(manifest_path.read_text())
-            for raw_job in raw.get("jobs", []):
-                if raw_job.get("job_id") == job.job_id:
-                    raw_job["enabled"] = job.enabled
-                    break
-            manifest_path.write_text(yaml.dump(raw, allow_unicode=True, sort_keys=False))
-
+            self._load_all_jobs()
             self._refresh_table()
 
         elif event.button.id == "btn-edit":
@@ -262,17 +269,8 @@ class PipelineApp(App):
                 if result is None:
                     return
 
-                # Update in-memory job config
-                job.enabled = result["enabled"]
-                job.connector_params["indicator_code"] = result["indicator_code"]
-                job.connector_params["country_code"] = result["country_code"]
-                job.export.filename = result["filename"]
-                job.export.format = result["format"]
-                for k, v in result["sql_params"].items():
-                    job.sql.params[k] = v
-
                 self._save_job(manifest_path, job.job_id, result)
-
+                self._load_all_jobs()
                 self._refresh_table()
 
             self.push_screen(

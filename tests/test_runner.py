@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.conftest import FakeSession
+from tests.conftest import FakeSession, make_page
 from wdi_pipeline.connectors.worldbank_indicator import WorldBankIndicatorConnector
 from wdi_pipeline.manifest import load_manifest
 from wdi_pipeline.runner import run_pipeline
@@ -16,13 +16,6 @@ from wdi_pipeline.exceptions import PipelineError
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _make_page(page: int, pages: int, data: list[dict]) -> list:
-    return [
-        {"page": page, "pages": pages, "per_page": 5000, "total": len(data)},
-        data,
-    ]
-
 
 def _sample_data(n: int = 3) -> list[dict]:
     return [
@@ -198,3 +191,24 @@ def test_only_flag_filters_jobs(tmp_manifest, tmp_path):
     summaries = run_pipeline(cfg, dry_run=True, only="job_b")
     assert len(summaries) == 1
     assert summaries[0].job_id == "job_b"
+
+
+def test_only_flag_nonexistent_id_raises(tmp_manifest, tmp_path):
+    """run_pipeline with only= pointing to a missing job_id raises PipelineError."""
+    path = tmp_manifest(
+        "  - job_id: gdp_jpn\n"
+        "    connector_params:\n"
+        "      indicator_code: NY.GDP.MKTP.CD\n"
+        "      country_code: JPN\n"
+        "    sql:\n"
+        "      file: queries/timeseries.sql\n"
+        "      params:\n"
+        "        min_year: \"2000\"\n"
+        "    export:\n"
+        "      filename: gdp_jpn\n"
+        "    schema:\n"
+        "      file: schemas/timeseries.yaml\n"
+    )
+    cfg = load_manifest(path, base_dir=path.parent)
+    with pytest.raises(PipelineError, match="No enabled job with id"):
+        run_pipeline(cfg, only="does_not_exist")

@@ -34,7 +34,7 @@ api-bulk-downloader/
 │       ├── manifest.yaml
 │       ├── queries/timeseries.sql
 │       └── schemas/timeseries.yaml
-├── tests/                         # 36 unit tests
+├── tests/                         # 55 unit tests
 ├── archive/
 │   └── api_bulk_downloader_v1/    # v1 reference (ZIP/stream approach)
 └── pyproject.toml
@@ -176,7 +176,7 @@ Example — `pipelines/gdp_jpn/manifest.yaml`:
 
 ```yaml
 defaults:
-  output_root: outputs/      # base directory for all exports
+  output_root: outputs/      # relative to CWD where wdi-pipeline is invoked
   export_format: parquet     # default format (csv or parquet) — Excel (.xlsx) is not supported
 
 jobs:
@@ -297,7 +297,7 @@ duration, row count, export path, discovery columns, and any error message.
 pytest tests/ -v
 ```
 
-36 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
+55 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
 accepts an injected `session` argument, and tests pass a `FakeSession`
 that returns pre-defined page payloads.
 

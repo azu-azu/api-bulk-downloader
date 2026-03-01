@@ -134,3 +134,65 @@ def test_run_all_allow_overwrite_skips_check(tmp_path):
         "--allow-overwrite",
     ])
     assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# run subcommand
+# ---------------------------------------------------------------------------
+
+def test_run_dry_run(tmp_path):
+    """run --manifest --dry-run succeeds without network calls."""
+    _write_pipeline(tmp_path, "my_pipeline")
+    manifest_path = tmp_path / "my_pipeline" / "manifest.yaml"
+    result = main([
+        "run",
+        "--manifest", str(manifest_path),
+        "--dry-run",
+        "--output-root", str(tmp_path / "out"),
+    ])
+    assert result == 0
+
+
+def test_run_missing_manifest_returns_error(monkeypatch):
+    """run with no --manifest and no WDI_MANIFEST env var returns exit code 1."""
+    monkeypatch.delenv("WDI_MANIFEST", raising=False)
+    result = main(["run"])
+    assert result == 1
+
+
+def test_run_only_flag(tmp_path):
+    """run --only filters to a single named job."""
+    _write_pipeline(tmp_path, "my_pipeline")
+    manifest_path = tmp_path / "my_pipeline" / "manifest.yaml"
+    result = main([
+        "run",
+        "--manifest", str(manifest_path),
+        "--dry-run",
+        "--only", "my_pipeline_job",
+        "--output-root", str(tmp_path / "out"),
+    ])
+    assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# list subcommand
+# ---------------------------------------------------------------------------
+
+def test_list_subcommand(tmp_path):
+    """list prints a table and exits 0."""
+    _write_pipeline(tmp_path, "my_pipeline")
+    result = main(["list", "--pipeline-dir", str(tmp_path)])
+    assert result == 0
+
+
+def test_list_no_pipeline_dir_error(monkeypatch):
+    """list with no --pipeline-dir and no WDI_PIPELINE_DIR returns exit code 1."""
+    monkeypatch.delenv("WDI_PIPELINE_DIR", raising=False)
+    result = main(["list"])
+    assert result == 1
+
+
+def test_list_empty_dir_error(tmp_path):
+    """list with a dir containing no manifests returns exit code 1."""
+    result = main(["list", "--pipeline-dir", str(tmp_path)])
+    assert result == 1
