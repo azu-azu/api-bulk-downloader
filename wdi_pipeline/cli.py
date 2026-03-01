@@ -122,13 +122,13 @@ def _require_pipeline_dir(args_value: str | None) -> str | None:
     return val
 
 
-# argparse でサブコマンドを解析
+# CLI（サブコマンドと引数）を定義（登録）
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="wdi-pipeline",
         description="Manifest-driven batch data pipeline.",
     )
-    # サブコマンド読み取り
+    # サブコマンド機構を有効化
     sub = parser.add_subparsers(dest="command", required=True)
 
     # --- run ---
@@ -237,8 +237,10 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
 
-    # 入力を解釈する
+    # CLI仕様（サブコマンドと引数）を定義
     parser = _build_parser()
+
+    # argv を解析して args に落とす
     args = parser.parse_args(argv)
 
     # == run == 単体実行の最小ループ
