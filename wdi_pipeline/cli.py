@@ -1,7 +1,7 @@
 """CLI entry point for the batch data pipeline.
 
 Usage:
-    wdi-pipeline run     [--manifest PATH] [--output-root PATH] [--dry-run] [--probe] [--only JOB_NAME]
+    wdi-pipeline run     [--manifest PATH] [--output-root PATH] [--dry-run] [--probe] [--only JOB_ID]
     wdi-pipeline run-all [--pipeline-dir PATH] [--output-root PATH] [--dry-run] [--probe]
     wdi-pipeline list    [--pipeline-dir PATH]
     wdi-pipeline gui     [--pipeline-dir PATH]
@@ -78,6 +78,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="cli",
         description="Manifest-driven batch data pipeline.",
     )
+    # サブコマンド読み取り
     sub = parser.add_subparsers(dest="command", required=True)
 
     # --- run ---
@@ -109,9 +110,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     run_p.add_argument(
         "--only",
-        metavar="JOB_NAME",
+        metavar="JOB_ID",
         default=None,
-        help="Execute only the named job.",
+        help="Execute only the job with this job_id.",
     )
     run_p.add_argument(
         "--log-level",
@@ -188,6 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    # run：単体実行の最小ループ
     if args.command == "run":
         setup_logging(args.log_level)
         # Resolve manifest path: CLI > env > error
@@ -219,8 +221,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
+    # 複数パイプライン一括実行
     elif args.command == "run-all":
         setup_logging(args.log_level)
+        # Resolve pipeline dir: CLI > env > error
         pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
         if not pipeline_dir_str:
             print(
@@ -231,12 +235,12 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         pipeline_dir = Path(pipeline_dir_str)
-        manifests = sorted(pipeline_dir.glob("*/manifest.yaml"))
+        manifests = sorted(pipeline_dir.glob("*/manifest.yaml")) # manifest を列挙
         if not manifests:
             print(f"No manifest.yaml found under '{pipeline_dir}'.", file=sys.stderr)
             return 1
 
-        # Load all manifests first (needed for preflight collision check)
+        # いったん全部ロードする（preflightのため）
         loaded = []
         for manifest_path in manifests:
             manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
@@ -245,6 +249,7 @@ def main(argv: list[str] | None = None) -> int:
             loaded.append((manifest_path, manifest))
 
         # Preflight collision check (skip only if --allow-overwrite)
+        # ファイル名が被るかどうかのチェック
         # Runs even in --dry-run / --probe mode so config errors are caught early.
         #
         # Naming spec (confirmed from source):
@@ -290,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
+    # 設定一覧表示
     elif args.command == "list":
         pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
         if not pipeline_dir_str:
@@ -328,6 +334,7 @@ def main(argv: list[str] | None = None) -> int:
         _simple_table(headers, table)
         return 0
 
+    # TUI起動
     elif args.command == "gui":
         pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
         if not pipeline_dir_str:
