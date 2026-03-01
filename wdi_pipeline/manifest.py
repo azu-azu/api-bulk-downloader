@@ -65,7 +65,6 @@ class JobConfig:
 class ManifestConfig:
     output_root: Path
     jobs: list[JobConfig]
-    default_format: str = "csv"
 
     def enabled_jobs(self) -> list[JobConfig]:
         return [j for j in self.jobs if j.enabled]
@@ -127,7 +126,6 @@ def load_manifest(manifest_path: str | Path, base_dir: Path | None = None) -> Ma
     return ManifestConfig(
         output_root=output_root,
         jobs=jobs,
-        default_format=default_format,
     )
 
 
