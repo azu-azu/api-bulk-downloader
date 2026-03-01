@@ -1,5 +1,9 @@
 """TUI dashboard for wdi-pipeline jobs.
 
+“ジョブ一覧＋編集” のTUI(Text-based UI)
+manifest.yaml を全部読んで、テーブルで表示して、
+選んだジョブを Enable切替 or 編集してYAMLに保存する
+
 Launch with:
     wdi-pipeline gui --pipeline-dir pipelines/
 
@@ -22,7 +26,7 @@ from textual.widgets import Button, DataTable, Footer, Header, Input, Label, Sel
 
 from wdi_pipeline.manifest import JobConfig, load_manifest
 
-
+# 編集用の モーダルダイアログ。
 class EditJobScreen(ModalScreen):
     """Modal dialog for editing a single job's configuration."""
 
@@ -132,6 +136,7 @@ class EditJobScreen(ModalScreen):
         return result
 
 
+# TUI本体。ジョブの 一覧表示と操作 を担当。
 class PipelineApp(App):
     """TUI dashboard for browsing and editing pipeline jobs."""
 
@@ -162,6 +167,7 @@ class PipelineApp(App):
         # Each entry: (manifest_path, job, output_root_str)
         self._rows: list[tuple[Path, JobConfig, str]] = []
 
+    # UI部品を “宣言的に並べる” 場所。
     def compose(self) -> ComposeResult:
         yield Header()
         yield DataTable(id="job-table")
@@ -176,6 +182,7 @@ class PipelineApp(App):
         self._load_all_jobs()
         self._refresh_table()
 
+    # データ読み込み（manifest全件ロード）
     def _load_all_jobs(self) -> None:
         self._rows = []
         manifest_paths = sorted(self._pipeline_dir.glob("*/manifest.yaml"))
@@ -191,6 +198,7 @@ class PipelineApp(App):
 
         self._rows.sort(key=lambda r: (not r[1].enabled, r[1].connector_params.get("indicator_code", "")))
 
+    # テーブル描画
     def _refresh_table(self) -> None:
         table = self.query_one("#job-table", DataTable)
         table.clear()
