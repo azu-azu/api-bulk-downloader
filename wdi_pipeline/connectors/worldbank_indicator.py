@@ -84,7 +84,12 @@ class WorldBankIndicatorConnector:
                 )
             conn.executemany(insert_sql, rows) # 一括INSERT
             total_rows += len(rows)
-            pages = int(meta.get("pages", 1)) # 最終ページまで回す
+            try:
+                pages = int(meta.get("pages", 1)) # 最終ページまで回す
+            except (TypeError, ValueError) as exc:
+                raise ConnectorError(
+                    f"WorldBank API returned invalid 'pages' in meta: {meta.get('pages')!r}"
+                ) from exc
             logger.info("  page %d/%d — %d rows", page, pages, len(rows))
             if page >= pages:
                 break
@@ -118,7 +123,13 @@ class WorldBankIndicatorConnector:
                 f"country={self.country_code}, page={page}): {exc}"
             ) from exc
 
-        payload = resp.json()
+        try:
+            payload = resp.json()
+        except ValueError as exc:
+            raise ConnectorError(
+                f"WorldBank API returned non-JSON response (indicator={self.indicator_code}, "
+                f"country={self.country_code}, page={page}): {exc}"
+            ) from exc
         if not isinstance(payload, list) or len(payload) < 2:
             raise ConnectorError(
                 f"Unexpected WorldBank API response format: {payload!r}"
@@ -128,6 +139,9 @@ class WorldBankIndicatorConnector:
         return meta, data
 
     # JSONを、DuckDBの行に変換
+    # NOTE: This method is hardcoded to produce exactly the 6 columns defined in
+    # timeseries.yaml (country_code, country_name, indicator_code, indicator_name,
+    # year, value). Any schema change in the YAML requires a matching update here.
     def _normalize(self, data: list[dict[str, Any]]) -> list[list[str | int | float | None]]:
         rows = []
         for item in data:

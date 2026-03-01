@@ -21,6 +21,9 @@ wdi-pipeline = "wdi_pipeline.cli:main"
 [tool.setuptools.packages.find]
 include = ["wdi_pipeline*"]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]

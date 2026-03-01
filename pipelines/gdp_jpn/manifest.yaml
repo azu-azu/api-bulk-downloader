@@ -1,9 +1,9 @@
 defaults:
-  output_root: outputs/
+  output_root: outputs/  # relative to CWD where wdi-pipeline is invoked
   export_format: csv
 jobs:
 - job_id: gdp_jpn
-  enabled: false
+  enabled: false  # set to true to include this job in run-all
   connector_params:
     indicator_code: NY.GDP.MKTP.CD
     country_code: JPN

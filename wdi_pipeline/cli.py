@@ -78,9 +78,33 @@ def _simple_table(headers: list[str], rows: list[list[str]]) -> None:
         print(fmt(row))
 
 
+def _require_manifest(args_value: str | None) -> str | None:
+    """Return resolved manifest path string, or None (error printed) if missing."""
+    val = args_value or os.environ.get("WDI_MANIFEST")
+    if not val:
+        print(
+            "Error: manifest path is required. "
+            "Use --manifest or set WDI_MANIFEST in .env.",
+            file=sys.stderr,
+        )
+    return val
+
+
+def _require_pipeline_dir(args_value: str | None) -> str | None:
+    """Return resolved pipeline dir string, or None (error printed) if missing."""
+    val = args_value or os.environ.get("WDI_PIPELINE_DIR")
+    if not val:
+        print(
+            "Error: pipeline dir is required. "
+            "Use --pipeline-dir or set WDI_PIPELINE_DIR in .env.",
+            file=sys.stderr,
+        )
+    return val
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="cli",
+        prog="wdi-pipeline",
         description="Manifest-driven batch data pipeline.",
     )
     # サブコマンド読み取り
@@ -198,13 +222,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         setup_logging(args.log_level)
         # Resolve manifest path: CLI > env > error
-        manifest_str = args.manifest or os.environ.get("WDI_MANIFEST")
+        manifest_str = _require_manifest(args.manifest)
         if not manifest_str:
-            print(
-                "Error: manifest path is required. "
-                "Use --manifest or set WDI_MANIFEST in .env.",
-                file=sys.stderr,
-            )
             return 1
         manifest_path = Path(manifest_str)
         manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
@@ -230,13 +249,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "run-all":
         setup_logging(args.log_level)
         # Resolve pipeline dir: CLI > env > error
-        pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
+        pipeline_dir_str = _require_pipeline_dir(args.pipeline_dir)
         if not pipeline_dir_str:
-            print(
-                "Error: pipeline dir is required. "
-                "Use --pipeline-dir or set WDI_PIPELINE_DIR in .env.",
-                file=sys.stderr,
-            )
             return 1
 
         pipeline_dir = Path(pipeline_dir_str)
@@ -271,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
                         continue
                     root = manifest.output_root
                     key = f"{manifest_path.parent.name}/{job.job_id}"
-                    ext = "csv" if job.export.format == "csv" else "parquet"
+                    ext = job.export.format
                     export_dest = str((root / f"{job.export.filename}.{ext}").resolve())
                     summary_dest = str((root / f"{job.job_id}_summary.json").resolve())
                     for dest, kind in ((export_dest, "export"), (summary_dest, "summary")):
@@ -302,13 +316,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # 設定一覧表示
     elif args.command == "list":
-        pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
+        pipeline_dir_str = _require_pipeline_dir(args.pipeline_dir)
         if not pipeline_dir_str:
-            print(
-                "Error: pipeline dir is required. "
-                "Use --pipeline-dir or set WDI_PIPELINE_DIR in .env.",
-                file=sys.stderr,
-            )
             return 1
 
         pipeline_dir = Path(pipeline_dir_str)
@@ -341,13 +350,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # TUI起動
     elif args.command == "gui":
-        pipeline_dir_str = args.pipeline_dir or os.environ.get("WDI_PIPELINE_DIR")
+        pipeline_dir_str = _require_pipeline_dir(args.pipeline_dir)
         if not pipeline_dir_str:
-            print(
-                "Error: pipeline dir is required. "
-                "Use --pipeline-dir or set WDI_PIPELINE_DIR in .env.",
-                file=sys.stderr,
-            )
             return 1
 
         from wdi_pipeline.tui import PipelineApp

@@ -1,7 +1,7 @@
 """a validated parser
 manifest.yaml（設定ファイル）を読み込んで、
 型付きの ManifestConfig / JobConfig に変換しつつ、
-エラーを早期に出す“バリデーション付きパーサ
+エラーを早期に出す"バリデーション付きパーサ
 
 This is a validated parser that loads manifest.yaml,
 converts it into typed dataclasses,
@@ -11,7 +11,7 @@ and fails fast with clear errors.
 YAML（文字列の設定）を読む
 期待する形（dict/list/必須キー）か検証する
 SQLファイルとschemaファイルのパスを解決して存在確認する
-JobConfig という “実行可能な構造体” に変換する
+JobConfig という "実行可能な構造体" に変換する
 enabled: true のジョブだけ取り出せるようにもする
 """
 
@@ -27,7 +27,7 @@ from wdi_pipeline.exceptions import ManifestValidationError
 
 _KNOWN_FORMATS = {"csv", "parquet"}
 
-# YAMLを “ただのdict” で持ち回すとキー間違いのリスクがあるため、型付きの箱（dataclass） に詰め替える。
+# YAMLを "ただのdict" で持ち回すとキー間違いのリスクがあるため、型付きの箱（dataclass） に詰め替える。
 @dataclass
 class ColumnDef:
     name: str
@@ -86,9 +86,12 @@ def load_manifest(manifest_path: str | Path, base_dir: Path | None = None) -> Ma
 
     # YAML読み込み
     with path.open() as fh:
-        raw = yaml.safe_load(fh)
+        try:
+            raw = yaml.safe_load(fh)
+        except yaml.YAMLError as exc:
+            raise ManifestValidationError(f"Manifest YAML parse error: {exc}") from exc
 
-    # “manifestはdictであるべき” を検証
+    # "manifestはdictであるべき" を検証
     if not isinstance(raw, dict):
         raise ManifestValidationError("Manifest must be a YAML mapping.")
 
@@ -97,6 +100,8 @@ def load_manifest(manifest_path: str | Path, base_dir: Path | None = None) -> Ma
 
     # defaults 読み込み
     defaults = raw.get("defaults", {})
+    # output_root is relative to the CWD at invocation time, not to this manifest file.
+    # Override with --output-root on the CLI to specify an absolute path.
     output_root = Path(defaults.get("output_root", "outputs/"))
     default_format = defaults.get("export_format", "csv").lower()
 
@@ -186,7 +191,12 @@ def _parse_job(
             f"Job '{job_id}': schema file not found: {schema_file}"
         )
     with schema_file.open() as fh:
-        raw_schema_data = yaml.safe_load(fh)
+        try:
+            raw_schema_data = yaml.safe_load(fh)
+        except yaml.YAMLError as exc:
+            raise ManifestValidationError(
+                f"Job '{job_id}': schema YAML parse error in {schema_file}: {exc}"
+            ) from exc
     if not isinstance(raw_schema_data, dict) or "columns" not in raw_schema_data:
         raise ManifestValidationError(
             f"Job '{job_id}': schema file must contain a 'columns' list."

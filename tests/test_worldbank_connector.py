@@ -6,7 +6,9 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from tests.conftest import FakeSession
+import requests
+
+from tests.conftest import FakeSession, make_page
 from wdi_pipeline.connectors.worldbank_indicator import WorldBankIndicatorConnector
 from wdi_pipeline.exceptions import ConnectorError
 from wdi_pipeline.manifest import (
@@ -21,13 +23,6 @@ from wdi_pipeline.manifest import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _make_page(page: int, pages: int, data: list[dict]) -> list:
-    return [
-        {"page": page, "pages": pages, "per_page": 5000, "total": pages * len(data)},
-        data,
-    ]
-
 
 def _sample_record(country_iso: str, year: int, value: float | None) -> dict:
     return {
@@ -85,7 +80,7 @@ def test_discover_returns_fixed_columns(tmp_path):
 
 def test_materialize_creates_dataset_table(tmp_path):
     data = [_sample_record("JPN", 2020, 5.0e12)]
-    fake = FakeSession([_make_page(1, 1, data)])
+    fake = FakeSession([make_page(1, 1, data)])
     connector = WorldBankIndicatorConnector(
         indicator_code="NY.GDP.MKTP.CD",
         country_code="JPN",
@@ -109,8 +104,8 @@ def test_materialize_multi_page(tmp_path):
     data_p1 = [_sample_record("JPN", 2020, 1.0)]
     data_p2 = [_sample_record("JPN", 2021, 2.0)]
     fake = FakeSession([
-        _make_page(1, 2, data_p1),
-        _make_page(2, 2, data_p2),
+        make_page(1, 2, data_p1),
+        make_page(2, 2, data_p2),
     ])
     connector = WorldBankIndicatorConnector(
         indicator_code="NY.GDP.MKTP.CD",
@@ -127,7 +122,7 @@ def test_materialize_multi_page(tmp_path):
 
 def test_materialize_empty_page_stops(tmp_path):
     """An empty data list on first page should produce an empty table."""
-    fake = FakeSession([_make_page(1, 1, [])])
+    fake = FakeSession([make_page(1, 1, [])])
     connector = WorldBankIndicatorConnector(
         indicator_code="NY.GDP.MKTP.CD",
         country_code="JPN",
@@ -143,7 +138,7 @@ def test_materialize_empty_page_stops(tmp_path):
 def test_materialize_null_value_allowed(tmp_path):
     """NULL values from the API (missing data) must not crash the insert."""
     data = [_sample_record("JPN", 2005, None)]
-    fake = FakeSession([_make_page(1, 1, data)])
+    fake = FakeSession([make_page(1, 1, data)])
     connector = WorldBankIndicatorConnector(
         indicator_code="NY.GDP.MKTP.CD",
         country_code="JPN",
@@ -160,8 +155,8 @@ def test_materialize_idempotent(tmp_path):
     """Calling materialize twice must not error (DROP TABLE IF EXISTS)."""
     data = [_sample_record("JPN", 2020, 5.0e12)]
     fake = FakeSession([
-        _make_page(1, 1, data),
-        _make_page(1, 1, data),
+        make_page(1, 1, data),
+        make_page(1, 1, data),
     ])
     connector = WorldBankIndicatorConnector(
         indicator_code="NY.GDP.MKTP.CD",
@@ -174,4 +169,46 @@ def test_materialize_idempotent(tmp_path):
     connector.materialize(job=job, conn=conn)
     count = conn.execute("SELECT COUNT(*) FROM dataset").fetchone()[0]
     assert count == 1
+    conn.close()
+
+
+class _ErrorSession:
+    """Fake session that raises a network error on get()."""
+
+    def get(self, url: str, **kwargs):
+        raise requests.ConnectionError("simulated network failure")
+
+
+def test_network_failure_raises_connector_error(tmp_path):
+    """A network error from the session must be re-raised as ConnectorError."""
+    connector = WorldBankIndicatorConnector(
+        indicator_code="NY.GDP.MKTP.CD",
+        country_code="JPN",
+        session=_ErrorSession(),
+    )
+    conn = duckdb.connect()
+    with pytest.raises(ConnectorError, match="WorldBank API request failed"):
+        connector.materialize(job=_make_wb_job(tmp_path), conn=conn)
+    conn.close()
+
+
+def test_non_json_response_raises_connector_error(tmp_path):
+    """A response whose .json() raises ValueError must become a ConnectorError."""
+
+    class _HtmlSession:
+        def get(self, url: str, **kwargs):
+            from unittest.mock import MagicMock
+            resp = MagicMock()
+            resp.raise_for_status = lambda: None
+            resp.json.side_effect = ValueError("not JSON")
+            return resp
+
+    connector = WorldBankIndicatorConnector(
+        indicator_code="NY.GDP.MKTP.CD",
+        country_code="JPN",
+        session=_HtmlSession(),
+    )
+    conn = duckdb.connect()
+    with pytest.raises(ConnectorError, match="non-JSON response"):
+        connector.materialize(job=_make_wb_job(tmp_path), conn=conn)
     conn.close()
