@@ -1,6 +1,7 @@
 """CLI entry point for the batch data pipeline.
 
-司令塔CLI
+司令塔
+入口で全部の“解釈”を終わらせて、runner に “実行” だけ渡す
 run / run-all / list / gui の4コマンドを argparse で受けて、
 .env を読んで、manifest.yaml をロードして、runner.run_pipeline() を呼ぶ。
 run-all のときだけ 出力先の衝突（上書き事故）を事前検知して止める
@@ -45,41 +46,59 @@ logger = logging.getLogger(__name__)
 # Table formatter (stdlib only — no tabulate dependency)
 # ---------------------------------------------------------------------------
 
+# 端末表示幅を「全角=2、半角=1」で数える
+# 日本語混じりの列名/パスを出したとき、普通の len() だと列がズレるから、それを回避する
 def _display_width(s: str) -> int:
     """Return terminal display width: full-width chars count as 2, others as 1."""
     return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in s)
 
 
+# pad = padding/ 文字の後ろにスペースを足して、列の幅をそろえる
 def _pad(s: str, width: int) -> str:
+    # 足りない分だけ " " を足す
     return s + " " * max(0, width - _display_width(s))
 
 
+# 列数を揃える → 各列の最大幅を計算 → 空白で右パディング → ヘッダ＋区切り線＋本体を印字
 def _simple_table(headers: list[str], rows: list[list[str]]) -> None:
     """Print a simple two-line-header table, handling full-width characters."""
+    # 列数（カラム数）をヘッダ基準で決める
     n = len(headers)
+
+    # 各行を文字列化して、「全行を必ず n 列にする」（正規化）
     norm: list[list[str]] = []
     for r in rows:
+        # True とか Path とか数字が混ざってても、全部文字列にする（print しやすくする）
         r = list(map(str, r))
         if len(r) < n:
+            # 足りない列は ""（空文字）で埋める
             r = r + [""] * (n - len(r))
         elif len(r) > n:
+            # 余った列は切り捨てる（表の列数を超えないように）
             r = r[:n]
         norm.append(r)
 
+    # ヘッダもデータも含めて列幅を決めたいから合体
     all_rows = [list(map(str, headers))] + norm
+
+    # 各列の “必要な横幅” を計算する（全角考慮）
     widths = [max(_display_width(cell) for cell in col) for col in zip(*all_rows)]
 
+    # 1行を “列幅に合わせて整形した文字列” にする関数 fmt を定義
     def fmt(row: list[str]) -> str:
         return "  ".join(_pad(c, w) for c, w in zip(row, widths))
 
+    # 印字（ヘッダ → 区切り線 → 本体）
     print(fmt(all_rows[0]))
     print("  ".join("-" * w for w in widths))
     for row in norm:
         print(fmt(row))
 
 
+# manifest のパスを“引数 or 環境変数”で確定する関数
 def _require_manifest(args_value: str | None) -> str | None:
     """Return resolved manifest path string, or None (error printed) if missing."""
+    # パス候補を決める（優先順位つき）
     val = args_value or os.environ.get("WDI_MANIFEST")
     if not val:
         print(
@@ -218,11 +237,11 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
 
-    # 解析
+    # 入力を解釈する
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    # run：単体実行の最小ループ
+    # == run == 単体実行の最小ループ
     if args.command == "run":
         setup_logging(args.log_level)
         # Resolve manifest path: CLI > env > error
@@ -230,12 +249,15 @@ def main(argv: list[str] | None = None) -> int:
         if not manifest_str:
             return 1
         manifest_path = Path(manifest_str)
+
+        # manifest をロードして設定を確定する
         manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
 
         # Resolve output_root: CLI > manifest default
         if args.output_root:
             manifest.output_root = Path(args.output_root)
 
+        # runner を呼ぶ（実行）
         summaries = run_pipeline(
             manifest,
             dry_run=args.dry_run,
@@ -249,7 +271,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
-    # 配下の複数manifestをまとめて実行
+    # == run-all == 複数manifest一括実行 + 衝突検知
     elif args.command == "run-all":
         setup_logging(args.log_level)
         # Resolve pipeline dir: CLI > env > error
@@ -265,7 +287,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"No manifest.yaml found under '{pipeline_dir}'.", file=sys.stderr)
             return 1
 
-        # preflightのために一回全部ロード
+        # 一回全部ロード
+        # 衝突検知（preflight）をするには、全ジョブの出力先を 事前に全件把握 する必要があるため
         loaded = []
         for manifest_path in manifests:
             manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
@@ -282,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
         #
         # Both paths are checked independently.
 
+        # preflight 離陸前点検（上書き事故の予防）
         # ファイル名が被るかどうかのチェック
         # --allow-overwrite が無い場合だけ実行
         if not args.allow_overwrite:
@@ -312,6 +336,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("\nUse --allow-overwrite to disable this check.", file=sys.stderr)
                 return 1
 
+        # runner を呼ぶ（run_pipeline を順に回す）
         all_failed = []
         for manifest_path, manifest in loaded:
             logger.info("=== Pipeline: %s ===", manifest_path.parent.name)
