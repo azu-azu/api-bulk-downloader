@@ -376,15 +376,14 @@ flowchart LR
     MANI -.->|"sql.file"| SQL_FILE
 
     %% per-job flow
-    RUN_PIPE --- RUN_CONN
-    RUN_CONN ---|"Enabled: True の job"| X(( ))
-    X --> DISC
+    RUN_PIPE ---|"Enabled: True の job"| X(( ))
+    X --> RUN_CONN
     X -->|"(conn, rendered_sql, out)"| EXPORT
+    X --- Y(( ))
+    Y --> RENDER
+    Y --> SQL_FILE
 
     RUN_PIPE -->|"dry_run"| SKIP
-    RUN_PIPE --- Y(( ))
-    Y --> SQL_FILE
-    Y --> RENDER
 
     DISC -->|"probe"| PROBED
     DISC -->|"full run"| MAT

@@ -37,6 +37,7 @@ def _build_session() -> requests.Session:
     return session
 
 
+# indicator: 指標（統計の測定項目） = GDPとか人口みたいな統計の指標
 @dataclass
 class WorldBankIndicatorConnector:
     indicator_code: str
@@ -46,14 +47,17 @@ class WorldBankIndicatorConnector:
 
     # ------------------------------------------------------------------
     # Protocol interface
+    # 「データソース差分」を閉じ込める場所 = コネクタに discover/materialize を持たせる
     # ------------------------------------------------------------------
 
     # 「このジョブはどんな列を持つか」を返す
+    # discover: “look at metadata” (columns, schema, available fields)
     def discover(self, job: JobConfig) -> DiscoveryResult:
         """Return schema columns from job config — no network call required."""
         return DiscoveryResult(columns=[c.name for c in job.schema.columns])
 
     # ページング取得→DuckDBへINSERT
+    # materialize: “build the real data” (network fetch + transform + load)
     def materialize(self, job: JobConfig, conn: duckdb.DuckDBPyConnection) -> None:
         """Stream-insert all pages into a DuckDB TABLE named 'dataset'."""
         cols_ddl = ", ".join(f"{c.name} {c.type}" for c in job.schema.columns)
