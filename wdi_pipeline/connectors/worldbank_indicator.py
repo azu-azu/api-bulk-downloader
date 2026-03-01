@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
 
+import duckdb
 # Web APIにGET/POSTしてデータを取るためのライブラリ
 import requests
 
@@ -53,7 +53,7 @@ class WorldBankIndicatorConnector:
         return DiscoveryResult(columns=[c.name for c in job.schema.columns])
 
     # ページング取得→DuckDBへINSERT
-    def materialize(self, job: JobConfig, conn: Any) -> None:  # duckdb.DuckDBPyConnection
+    def materialize(self, job: JobConfig, conn: duckdb.DuckDBPyConnection) -> None:
         """Stream-insert all pages into a DuckDB TABLE named 'dataset'."""
         cols_ddl = ", ".join(f"{c.name} {c.type}" for c in job.schema.columns)
 

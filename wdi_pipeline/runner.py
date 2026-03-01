@@ -6,8 +6,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
-
 import duckdb
 
 from wdi_pipeline.connectors.worldbank_indicator import WorldBankIndicatorConnector
@@ -146,5 +144,5 @@ def _run_job(
     return summary
 
 
-def _build_connector(job: JobConfig) -> Any:
+def _build_connector(job: JobConfig) -> WorldBankIndicatorConnector:
     return WorldBankIndicatorConnector(**job.connector_params)

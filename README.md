@@ -303,6 +303,13 @@ that returns pre-defined page payloads.
 
 ---
 
+## Further reading
+
+- [DESIGN.md](DESIGN.md) — 設計判断とその理由
+- [docs/connectors.md](docs/connectors.md) — コネクター設定リファレンス
+
+---
+
 ## Archive
 
 `archive/api_bulk_downloader_v1/` is the original v1 implementation:
@@ -327,9 +334,9 @@ flowchart LR
 
     SKIP(["⏭ skipped"])
 
-    subgraph CONN ["<u><b>connectors/(source name)</b></u>"]
-        DISC["<i>Schema Discovery</i><br><br>discover()<br><br>-----<br><br>job.schema から列名取得"]
-        MAT["<i>Data Fetch</i><br><br>materialize()<br><br>-----<br><br>テーブル作成"]
+    subgraph CONN ["<big><big><big><big><u><b>connectors/*.py</b></u>"]
+        DISC["<big><b>discover()</b></big><br><br>-----<br><br>job.schema から列名取得"]
+        MAT["<big><b>materialize()</b></big><br><br>-----<br><br>テーブル作成"]
     end
 
     PROBED(["⏭ probe 完了<br>列名確認のみ"])
