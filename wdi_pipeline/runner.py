@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
+
 import duckdb
 
 from wdi_pipeline.connectors.worldbank_indicator import WorldBankIndicatorConnector
@@ -69,79 +71,78 @@ def _run_job(
     probe: bool,
 ) -> JobSummary:
 
-    # 記録箱（JobSummary）を作る
     summary = make_summary(job.job_id)
     logger.info("=== Job: %s ===", job.job_id)
 
-    # dry_run なら ネットワークもexportもやらずに即終了（status=skipped）
-    # 流れを確認するだけのモード
-    if dry_run:
-        logger.info("[dry-run] Skipping job '%s' — no network calls.", job.job_id)
-        summary.status = "skipped"
-        summary.finish()
-        return summary
+    # finish() に渡す引数を積んでおく箱。最後に1回だけ呼ぶ。
+    finish_kwargs: dict[str, Any] = {}
 
-    # コネクタ生成
-    connector = _build_connector(job)
     try:
-        # discover() is always called (no network required for worldbank)
-        # 列情報などのメタ探索
-        logger.info("  discover …")
-        discovery = connector.discover(job)
-        logger.info("  discover done: %d columns", len(discovery.columns))
+        if dry_run:
+            # 流れを確認するだけのモード（ネットワーク・export なし）
+            logger.info("[dry-run] Skipping job '%s' — no network calls.", job.job_id)
+            summary.status = "skipped"
+        else:
+            # コネクタ生成 → discover（常に実行、ネットワーク不要）
+            connector = _build_connector(job)
+            logger.info("  discover …")
+            discovery = connector.discover(job)
+            logger.info("  discover done: %d columns", len(discovery.columns))
 
-        # probe なら discoverだけで終了（status=probed）
-        # schema/列が想定どおりかの確認、接続や設定の確認モード
-        if probe:
-            logger.info("[probe] Job '%s' — discover complete, skipping materialize.", job.job_id)
-            summary.status = "probed"
-            summary.finish(discovery_columns=discovery.columns)
-            return summary
+            if probe:
+                # schema/列が想定どおりかの確認モード（materialize なし）
+                logger.info("[probe] Job '%s' — discover complete, skipping materialize.", job.job_id)
+                summary.status = "probed"
+                finish_kwargs["discovery_columns"] = discovery.columns
+            else:
+                # -- Full execution --
+                conn = duckdb.connect()
+                try:
+                    logger.info("  materialize …")
+                    connector.materialize(job, conn)
+                    logger.info("  materialize done")
 
-        # -- Full execution --
-        conn = duckdb.connect()
-        try:
-            # データをDuckDB内にテーブルとして作る/投入する
-            logger.info("  materialize …")
-            connector.materialize(job, conn)
-            logger.info("  materialize done")
+                    sql_text = job.sql.file.read_text()
+                    rendered_sql = render(sql_text, job.sql.params)
 
-            # SQLテンプレ読み込み → render() でパラメータ反映
-            # job.sql.file: from manifest
-            sql_text = job.sql.file.read_text()
-            rendered_sql = render(sql_text, job.sql.params)
+                    ext = job.export.format
+                    dest = (output_root / f"{job.export.filename}.{ext}").resolve()
 
-            # output path
-            ext = job.export.format
-            dest = (output_root / f"{job.export.filename}.{ext}").resolve()
+                    logger.info("  export …")
+                    rows = export(conn, rendered_sql, dest, job.export.format)
+                finally:
+                    conn.close()
 
-            # SQL結果をファイルに書き出す
-            logger.info("  export …")
-            rows = export(conn, rendered_sql, dest, job.export.format)
-        finally:
-            conn.close()
+                summary.status = "success"
+                finish_kwargs.update(
+                    rows=rows,
+                    export_path=dest,
+                    discovery_columns=discovery.columns,
+                )
 
-        # summaryに結果（rows, export_path, columns, duration）を書いてログ出して終わり
-        summary.status = "success"
-        summary.finish(
-            rows=rows,
-            export_path=dest,
-            discovery_columns=discovery.columns,
-        )
-        logger.info("Job '%s' done — %d rows → %s  (%.2f s)", job.job_id, rows, dest, summary.duration_seconds)
-
-    # 例外
     except PipelineError as exc:
         logger.error("Job '%s' failed: %s", job.job_id, exc)
         summary.status = "failed"
-        summary.finish(error=str(exc))
+        finish_kwargs = {"error": str(exc)}
     except Exception as exc:
         logger.exception("Unexpected error in job '%s'", job.job_id)
         summary.status = "failed"
-        summary.finish(error=f"Unexpected error: {exc}")
+        finish_kwargs = {"error": f"Unexpected error: {exc}"}
+    finally:
+        summary.finish(**finish_kwargs)
+
+    if summary.status == "success":
+        logger.info(
+            "Job '%s' done — %d rows → %s  (%.2f s)",
+            job.job_id,
+            finish_kwargs["rows"],
+            finish_kwargs["export_path"],
+            summary.duration_seconds,
+        )
 
     return summary
 
 
 def _build_connector(job: JobConfig) -> WorldBankIndicatorConnector:
+    # 現状 WorldBank のみ。複数コネクタに対応するときは connector_type フィールド＋レジストリ方式へ。
     return WorldBankIndicatorConnector(**job.connector_params)
