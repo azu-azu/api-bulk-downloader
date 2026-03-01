@@ -321,65 +321,78 @@ It is kept for reference only and is not installed by `pyproject.toml`.
 
 ```mermaid
 flowchart LR
-    CLI["<i>Entry Point</i><br><br><u><b><big>cli.py</b></u></big><br>main()<br><br>-----<br><br>run all の場合は<br>ここでループする"]
-    MAN["<u><b><big>manifest.py</big></u></b><br>load_manifest()<br><br>-----<br><br>job.schema を作る"]
-    RUN["<u><b><big>runner.py</big></u></b><br>run_pipeline()<br><br>-----<br><br>1 manifest の <br>job を実行する"]
+    CLI["<i>Entry Point</i><br><br><u><b><big>cli.py</b></u></big><br>main()<br><br>-----<br><br>argparseで<br>実行内容の判定"]
+    MAN["<u><b><big>manifest.py</big></u></b><br>load_manifest()<br><br>-----<br><br>ManifestConfig を作る<br>(jobs / schema / sql paths)"]
 
     %% inputs (auxiliary)
     subgraph PRE ["<u><b>pipelines/*/</b></u><br>（事前設定）"]
-        MF[/"<u><b><big>manifest.yaml</big></u></b><br>job定義<br><br>1 job = 1 CSV出力"/]
+        MF[/"<u><b><big>manifest.yaml</big></u></b><br>job定義<br><br>1 job = 1 output file (csv/parquet)"/]
         SCH[/"<u><b><big>schemas/timeseries.yaml</big></u></b><br>列定義 (name · type)"/]
         SQL_FILE[/"<u><b><big>queries/timeseries.sql</big></u></b><br>SQL テンプレ"/]
     end
 
-    SKIP(["⏭ skipped"])
-
-    subgraph CONN ["<big><big><big><big><u><b>connectors/*.py</b></u>"]
-        DISC["<big><b>discover()</b></big><br><br>-----<br><br>job.schema から列名取得"]
-        MAT["<big><b>materialize()</b></big><br><br>-----<br><br>テーブル作成"]
+    subgraph RUNNER ["<u><b><big><big><big>runner.py</big></u></b>"]
+        RUN_PIPE["<b>run_pipeline()</b><br><br>-----<br><br>enabled_jobs() を回す<br>jobごとに実行して summary を集める"]
+        RUN_CONN["<b>_build_connector()</b><br><br>-----<br><br>connector 生成"]
     end
 
-    PROBED(["⏭ probe 完了<br>列名確認のみ"])
+    subgraph CONN ["<u><b><big><big>connectors/*.py</big></u></b>"]
+        DISC["<b>discover()</b><br><br>-----<br><br>columns 確定 / schema 検証"]
+        MAT["<b>materialize()</b><br><br>-----<br><br>DuckDBに投入"]
+    end
 
-    WB[/"<u><b><big>World Bank Indicator API</big></u></b><br>JSON ページング · urllib3.Retry"/]
+    %% states
+    SKIP(["⏭ skipped<br>(dry_run)"])
+    PROBED(["⏭ probed<br>(probe)"])
+    FAILED(["❌ failed"])
+    SUCCESS(["✅ success"])
 
-    DS[("（メモリ上）<br><u><b><big>TABLE dataset</big></u></b><br>-----<br><br>（例）<br>country_code<br>country_name<br>indicator_code<br>indicator_name<br>year<br>value")]
+    %% external & db
+    WB[/"<u><b><big>World Bank Indicator API</big></u></b><br>JSON paging"/]
+    DS[("DuckDB (in-memory)<br><u><b>TABLE dataset</b></u>")]
 
-    RENDER["<u><b><big>sql_template.py</big></u></b><br>render()<br><br>-----<br><br>{{key}} → SQL リテラル"]
-
+    %% sql/export/summary
+    RENDER["<u><b><big>sql_template.py</big></u></b><br>render()<br><br>-----<br><br>template + params → SQL"]
     EXPORT["<u><b><big>exporter.py</big></u></b><br>export()<br><br>-----<br><br>SQL実行・ファイル生成"]
-
-    SUM["<u><b><big>summary.py</big></u></b><br>write()<br><br>-----<br><br>ジョブ結果を JSON 出力"]
+    SUM_WRITE["<u><b><big>summary.py</big></u></b><br>write()<br><br>-----<br><br>JobSummary を JSON 出力"]
 
     OUT_DATA[/"<u><b><big>outputs/</big></u></b><br>*.csv / *.parquet"/]
     OUT_SUM[/"<u><b><big>outputs/</big></u></b><br>*_summary.json"/]
 
     %% main flow
     CLI --> MAN
-    CLI --> RUN
-    MAN -.->|"ManifestConfig"| RUN
+    CLI --> RUN_PIPE
+
     MF -.->|"load"| MAN
     MAN -.->|"schema.file"| SCH
     MAN -.->|"sql.file"| SQL_FILE
+    MAN -.->|"ManifestConfig"| RUN_PIPE
 
-    RUN -->|"--dry-run"| SKIP
-    RUN -->|"enabled: true の job"| DISC
+    %% per-job flow
+    RUN_PIPE -->|"jobごと"| RUN_CONN --> DISC
+    RUN_PIPE -->|"dry_run"| SKIP
 
-    DISC -->|"--probe"| PROBED
+    DISC -->|"probe"| PROBED
     DISC -->|"full run"| MAT
 
-    MAT -.->|"duckdb.connect()<br>（in-memory）"| DS
-    MAT <-->|"GET /v2/country/{cc}/indicator/{ic}?page=N<br>← [{meta}, [{records}]]"| WB
-    MAT -->|"INSERT rows<br>(page by page)"| DS
+    MAT -->|"INSERT rows"| DS
+    MAT <-->|"GET /v2/...page=N"| WB
 
-    DS -->|"data source (TABLE dataset)"| EXPORT
     SQL_FILE -.->|"template"| RENDER
-    RENDER -->|"sql string"| EXPORT
+    DS -->|"data source"| EXPORT
+    RENDER -->|"sql"| EXPORT
     EXPORT --> OUT_DATA
-    EXPORT --> SUM
-    SKIP --> SUM
-    PROBED --> SUM
-    SUM --> OUT_SUM
+    EXPORT --> SUCCESS
+
+    %% errors (simplified)
+    RUN_PIPE -->|"exception"| FAILED
+
+    %% write summary (called in run_pipeline)
+    SKIP --> SUM_WRITE
+    PROBED --> SUM_WRITE
+    SUCCESS --> SUM_WRITE
+    FAILED --> SUM_WRITE
+    SUM_WRITE --> OUT_SUM
 
     classDef entry fill:#e0f7fa,stroke:#0097a7,color:#000
     classDef file  fill:#e8f0fe,stroke:#4a7fcb,color:#000
@@ -392,6 +405,5 @@ flowchart LR
     class MF,SCH,SQL_FILE file
     class WB ext
     class DS db
-    class SKIP,PROBED term
+    class SKIP,PROBED,SUCCESS,FAILED term
     class OUT_DATA,OUT_SUM out
-```

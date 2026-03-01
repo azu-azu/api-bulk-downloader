@@ -42,6 +42,8 @@ class JobSummary:
         self.duration_seconds = round(
             (finished - started).total_seconds(), 3
         )
+
+        # 渡された値だけ上書きする（None は無視）
         if rows is not None:
             self.rows_exported = rows
         if export_path is not None:
