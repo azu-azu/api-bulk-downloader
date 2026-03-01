@@ -120,7 +120,6 @@ def _run_job(
             rows = export(conn, rendered_sql, dest, job.export.format)
         finally:
             conn.close()
-        # -- Full execution --
 
         # summaryに結果（rows, export_path, columns, duration）を書いてログ出して終わり
         summary.status = "success"
