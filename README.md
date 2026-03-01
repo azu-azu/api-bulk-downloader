@@ -247,15 +247,76 @@ The materialized API data is always available as a DuckDB table named `dataset`.
 
 ## Architecture
 
-### Data flow per job
+### Connector interface
+
+Connectors are duck-typed — any class implementing these two methods works:
+
+```python
+def discover(self, job: JobConfig) -> DiscoveryResult: ...
+def materialize(self, job: JobConfig, conn: duckdb.DuckDBPyConnection) -> None: ...
+```
+
+`runner.py` calls both methods for every enabled job.
+`discover()` is always a no-network call — it reads column names from `job.schema`.
+`materialize()` builds the `CREATE TABLE` DDL dynamically from `job.schema` and
+streams API pages directly into a per-job DuckDB connection — no full dataset is
+held in memory.
+
+### Per-job isolation
+
+Each job gets a fresh `duckdb.connect()` that is closed after export.
+Failure in one job logs an error and continues to the next.
+
+### Retry
+
+`WorldBankIndicatorConnector` uses `urllib3.Retry` with
+`backoff_factor=1.0` on HTTP 429, 500, 502, 503, 504 (up to 3 attempts).
+
+---
+
+## Output
+
+After a successful run, `outputs/` contains:
+
+```
+outputs/
+├── gdp_jpn.parquet
+├── gdp_jpn_summary.json
+├── population_latam.csv
+└── population_latam_summary.json
+```
+
+Each `_summary.json` records job id, status, start/end time,
+duration, row count, export path, discovery columns, and any error message.
+
+---
+
+## Testing
+
+```bash
+pytest tests/ -v
+```
+
+36 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
+accepts an injected `session` argument, and tests pass a `FakeSession`
+that returns pre-defined page payloads.
+
+---
+
+## Archive
+
+`archive/api_bulk_downloader_v1/` is the original v1 implementation:
+a streaming HTTP downloader that fetched ZIP archives and counted CSV rows.
+It is kept for reference only and is not installed by `pyproject.toml`.
+
+
+## Data flow per job
 
 ```mermaid
 flowchart LR
-    CLI["Entry Point<br>-----<br><br><u><b>cli.py</b></u><br>main()<br><br>全実行の場合は<br>ここでループする"]
-
-    RUN["Job Executor<br>-----<br><br><u><b>runner.py</b></u><br>run_pipeline()<br><br>1 manifest の <br>job を実行する"]
-
-    MAN["Config Load<br>-----<br><br><u><b>manifest.py</b></u><br>load_manifest()<br>job.schema を作る"]
+    CLI["<i>Entry Point</i><br><br><u><b><big>cli.py</b></u></big><br>main()<br><br>-----<br><br>run all の場合は<br>ここでループする"]
+    MAN["<u><b><big>manifest.py</big></u></b><br>load_manifest()<br><br>-----<br><br>job.schema を作る"]
+    RUN["<u><b><big>runner.py</big></u></b><br>run_pipeline()<br><br>-----<br><br>1 manifest の <br>job を実行する"]
 
     %% inputs (auxiliary)
     subgraph PRE ["<u><b>pipelines/*/</b></u><br>（事前設定）"]
@@ -327,65 +388,3 @@ flowchart LR
     class SKIP,PROBED term
     class OUT_DATA,OUT_SUM out
 ```
-
-### Connector interface
-
-Connectors are duck-typed — any class implementing these two methods works:
-
-```python
-def discover(self, job: JobConfig) -> DiscoveryResult: ...
-def materialize(self, job: JobConfig, conn: duckdb.DuckDBPyConnection) -> None: ...
-```
-
-`runner.py` calls both methods for every enabled job.
-`discover()` is always a no-network call — it reads column names from `job.schema`.
-`materialize()` builds the `CREATE TABLE` DDL dynamically from `job.schema` and
-streams API pages directly into a per-job DuckDB connection — no full dataset is
-held in memory.
-
-### Per-job isolation
-
-Each job gets a fresh `duckdb.connect()` that is closed after export.
-Failure in one job logs an error and continues to the next.
-
-### Retry
-
-`WorldBankIndicatorConnector` uses `urllib3.Retry` with
-`backoff_factor=1.0` on HTTP 429, 500, 502, 503, 504 (up to 3 attempts).
-
----
-
-## Output
-
-After a successful run, `outputs/` contains:
-
-```
-outputs/
-├── gdp_jpn.parquet
-├── gdp_jpn_summary.json
-├── population_latam.csv
-└── population_latam_summary.json
-```
-
-Each `_summary.json` records job id, status, start/end time,
-duration, row count, export path, discovery columns, and any error message.
-
----
-
-## Testing
-
-```bash
-pytest tests/ -v
-```
-
-36 unit tests. HTTP is never called in tests — `WorldBankIndicatorConnector`
-accepts an injected `session` argument, and tests pass a `FakeSession`
-that returns pre-defined page payloads.
-
----
-
-## Archive
-
-`archive/api_bulk_downloader_v1/` is the original v1 implementation:
-a streaming HTTP downloader that fetched ZIP archives and counted CSV rows.
-It is kept for reference only and is not installed by `pyproject.toml`.
