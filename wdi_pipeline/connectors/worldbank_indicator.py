@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 import duckdb
 # Web APIにGET/POSTしてデータを取るためのライブラリ
@@ -101,7 +102,7 @@ class WorldBankIndicatorConnector:
     # ------------------------------------------------------------------
 
     # API を叩いて JSON を検証
-    def _fetch_page(self, page: int) -> tuple[dict, list]:
+    def _fetch_page(self, page: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         url = (
             f"{_BASE_URL}/country/{self.country_code}"
             f"/indicator/{self.indicator_code}"
@@ -127,7 +128,7 @@ class WorldBankIndicatorConnector:
         return meta, data
 
     # JSONを、DuckDBの行に変換
-    def _normalize(self, data: list[dict]) -> list[list]:
+    def _normalize(self, data: list[dict[str, Any]]) -> list[list[str | int | float | None]]:
         rows = []
         for item in data:
             country = item.get("country") or {}

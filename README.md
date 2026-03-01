@@ -322,7 +322,12 @@ It is kept for reference only and is not installed by `pyproject.toml`.
 ```mermaid
 flowchart LR
     CLI["<i>Entry Point</i><br><br><u><b><big>cli.py</b></u></big><br>main()<br><br>-----<br><br>argparseで<br>実行内容の判定"]
-    MAN["<u><b><big>manifest.py</big></u></b><br>load_manifest()<br><br>-----<br><br>ManifestConfig を作る<br>(jobs / schema / sql paths)"]
+    MANI["<u><b><big>manifest.py</big></u></b><br>load_manifest()<br><br>-----<br><br>ManifestConfig を作る<br>(jobs / schema / sql paths)"]
+
+
+    %% NEW: TUI branch
+    TUI["<u><b><big>tui_gui.py</big></u></b><br><br>設定の一覧表示<br>編集・更新"]
+
 
     %% inputs (auxiliary)
     subgraph PRE ["<u><b>pipelines/*/</b></u><br>（事前設定）"]
@@ -360,17 +365,25 @@ flowchart LR
     OUT_SUM[/"<u><b><big>outputs/</big></u></b><br>*_summary.json"/]
 
     %% main flow
-    CLI --> MAN
-    CLI --> RUN_PIPE
+    TUI <-.-> PRE
 
-    MF -.->|"load"| MAN
-    MAN -.->|"schema.file"| SCH
-    MAN -.->|"sql.file"| SQL_FILE
-    MAN -.->|"ManifestConfig"| RUN_PIPE
+    CLI --- MANI
+
+    MF -.->|"load"| MANI
+    MANI -.->|"schema.file"| SCH
+    MANI -.->|"sql.file"| SQL_FILE
+    MANI -->|"ManifestConfig"| RUN_PIPE
 
     %% per-job flow
-    RUN_PIPE -->|"jobごと"| RUN_CONN --> DISC
+    RUN_PIPE --- RUN_CONN
+    RUN_CONN ---|"Enabled: True の job"| X(( ))
+    X --> DISC
+    X -->|"(conn, rendered_sql, out)"| EXPORT
+
     RUN_PIPE -->|"dry_run"| SKIP
+    RUN_PIPE --- Y(( ))
+    Y --> SQL_FILE
+    Y --> RENDER
 
     DISC -->|"probe"| PROBED
     DISC -->|"full run"| MAT
@@ -378,9 +391,6 @@ flowchart LR
     MAT -->|"INSERT rows"| DS
     MAT <-->|"GET /v2/...page=N"| WB
 
-    SQL_FILE -.->|"template"| RENDER
-    DS -->|"data source"| EXPORT
-    RENDER -->|"sql"| EXPORT
     EXPORT --> OUT_DATA
     EXPORT --> SUCCESS
 
