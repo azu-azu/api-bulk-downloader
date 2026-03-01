@@ -4,9 +4,13 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+# Web APIにGET/POSTしてデータを取るためのライブラリ
 import requests
+
+# 「HTTPリクエストが失敗したときに、何回・どんな条件で・どれくらい待って再試行するか」**を決めるためのクラス
 from urllib3.util.retry import Retry
 
+# 別ファイルで定義したものを読み込み
 from wdi_pipeline.connectors.protocol import DiscoveryResult
 from wdi_pipeline.exceptions import ConnectorError
 from wdi_pipeline.manifest import JobConfig
@@ -16,6 +20,8 @@ logger = logging.getLogger(__name__)
 _BASE_URL = "https://api.worldbank.org/v2"
 
 
+# requests.Session = 通信の状態＋設定をまとめて持つ箱
+# sessionを作ると、同じ設定（リトライ等）＋同じ接続をまとめて再利用できる
 def _build_session() -> requests.Session:
     retry = Retry(
         total=3,
@@ -41,30 +47,37 @@ class WorldBankIndicatorConnector:
     # Protocol interface
     # ------------------------------------------------------------------
 
+    # 「このジョブはどんな列を持つか」を返す
     def discover(self, job: JobConfig) -> DiscoveryResult:
         """Return schema columns from job config — no network call required."""
         return DiscoveryResult(columns=[c.name for c in job.schema.columns])
 
+    # ページング取得→DuckDBへINSERT
     def materialize(self, job: JobConfig, conn: Any) -> None:  # duckdb.DuckDBPyConnection
         """Stream-insert all pages into a DuckDB TABLE named 'dataset'."""
         cols_ddl = ", ".join(f"{c.name} {c.type}" for c in job.schema.columns)
-        conn.execute("DROP TABLE IF EXISTS dataset")
-        conn.execute(f"CREATE TABLE dataset ({cols_ddl})")
 
+        # テーブルを作り直す
+        conn.execute("DROP TABLE IF EXISTS dataset") # dataset テーブルが 既に存在してたら削除
+        conn.execute(f"CREATE TABLE dataset ({cols_ddl})") # 新しく作る
+
+        # INSERT文を準備
+        # ? は DuckDB Python のパラメータプレースホルダ/列数ぶん ?, ?, ?, ... を生成
         placeholders = ", ".join(["?"] * len(job.schema.columns))
         insert_sql = f"INSERT INTO dataset VALUES ({placeholders})"
 
+        # ページを1から回す
         page = 1
         total_rows = 0
         while True:
-            meta, data = self._fetch_page(page)
+            meta, data = self._fetch_page(page) # API から meta と data を取る
             if not data:
                 logger.debug("Page %d returned empty data — stopping.", page)
                 break
-            rows = self._normalize(data)
-            conn.executemany(insert_sql, rows)
+            rows = self._normalize(data) # JSON→行配列に変換
+            conn.executemany(insert_sql, rows) # 一括INSERT
             total_rows += len(rows)
-            pages = int(meta.get("pages", 1))
+            pages = int(meta.get("pages", 1)) # 最終ページまで回す
             logger.info("  page %d/%d — %d rows", page, pages, len(rows))
             if page >= pages:
                 break
@@ -81,11 +94,13 @@ class WorldBankIndicatorConnector:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    # API を叩いて JSON を検証
     def _fetch_page(self, page: int) -> tuple[dict, list]:
         url = (
             f"{_BASE_URL}/country/{self.country_code}"
             f"/indicator/{self.indicator_code}"
         )
+        # params= を使うと、URLの「?key=value&...」部分を requests が安全に組み立ててくれる
         params = {"format": "json", "per_page": self.per_page, "page": page}
         try:
             resp = self.session.get(url, params=params, timeout=30)
@@ -105,6 +120,7 @@ class WorldBankIndicatorConnector:
         data = payload[1] or []
         return meta, data
 
+    # JSONを、DuckDBの行に変換
     def _normalize(self, data: list[dict]) -> list[list]:
         rows = []
         for item in data:
