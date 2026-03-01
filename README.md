@@ -274,6 +274,53 @@ Failure in one job logs an error and continues to the next.
 
 ---
 
+## Data model
+
+The pipeline currently exports a single flat (denormalized) `dataset` table per job.
+The diagram below shows a normalized relational design of that data.
+
+```mermaid
+erDiagram
+    countries {
+        VARCHAR country_code PK
+        VARCHAR country_name
+    }
+
+    indicators {
+        VARCHAR indicator_code PK
+        VARCHAR indicator_name
+    }
+
+    observations {
+        VARCHAR country_code   PK "FK → countries"
+        VARCHAR indicator_code PK "FK → indicators"
+        INTEGER year           PK
+        DOUBLE  value
+    }
+
+    job_runs {
+        VARCHAR   job_id           PK
+        VARCHAR   status
+        TIMESTAMP started_at
+        TIMESTAMP finished_at
+        DOUBLE    duration_seconds
+        INTEGER   rows_exported
+        VARCHAR   export_path
+        VARCHAR   error
+    }
+
+    countries  ||--|{  observations : "country_code"
+    indicators ||--|{  observations : "indicator_code"
+```
+
+> **現状との差分**
+> `_normalize()` が返す生データは `countries` / `indicators` / `observations` に相当する列を
+> すべて1行に詰め込んだ非正規化テーブル (`dataset`) として DuckDB に一時ロードされる。
+> `country_name` / `indicator_name` は各行に重複して格納されており、正規化はされていない。
+> `job_runs` は `*_summary.json` として出力されるが、DB テーブルには永続化されない。
+
+---
+
 ## Output
 
 After a successful run, `outputs/` contains:
