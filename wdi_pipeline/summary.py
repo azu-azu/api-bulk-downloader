@@ -1,3 +1,7 @@
+"""記録用データクラス
+1ジョブの実行結果を、同じ形で集計して JSON に保存する
+"""
+
 from __future__ import annotations
 
 import json
@@ -9,6 +13,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+# 「ジョブ結果の1レコード」を定義
 @dataclass
 class JobSummary:
     job_id: str
@@ -21,6 +26,7 @@ class JobSummary:
     discovery_columns: list[str] = field(default_factory=list)
     error: str | None = None
 
+    # 「ジョブが終わった瞬間にまとめて確定させる」関数。
     def finish(
         self,
         *,

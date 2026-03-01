@@ -63,14 +63,12 @@ class EditJobScreen(ModalScreen):
         self,
         manifest_path: Path,
         job: JobConfig,
-        default_format: str,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._manifest_path = manifest_path
         self._job = job
-        self._default_format = default_format
 
     def compose(self) -> ComposeResult:
         job = self._job
@@ -161,8 +159,8 @@ class PipelineApp(App):
     def __init__(self, pipeline_dir: str | Path) -> None:
         super().__init__()
         self._pipeline_dir = Path(pipeline_dir)
-        # Each entry: (manifest_path, job, default_format, output_root_str)
-        self._rows: list[tuple[Path, JobConfig, str, str]] = []
+        # Each entry: (manifest_path, job, output_root_str)
+        self._rows: list[tuple[Path, JobConfig, str]] = []
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -186,19 +184,17 @@ class PipelineApp(App):
                 manifest = load_manifest(manifest_path, base_dir=manifest_path.parent)
                 for job in manifest.jobs:
                     self._rows.append(
-                        (manifest_path, job, manifest.default_format, str(manifest.output_root))
+                        (manifest_path, job, str(manifest.output_root))
                     )
             except Exception as exc:
                 self.notify(f"Error loading {manifest_path.name}: {exc}", severity="error")
 
-        self._rows.sort(
-            key=lambda r: (not r[1].enabled, r[1].connector_params.get("indicator_code", ""))
-        )
+        self._rows.sort(key=lambda r: (not r[1].enabled, r[1].connector_params.get("indicator_code", "")))
 
     def _refresh_table(self) -> None:
         table = self.query_one("#job-table", DataTable)
         table.clear()
-        for _, job, _, output_root_str in self._rows:
+        for _, job, output_root_str in self._rows:
             enabled_str = "✓" if job.enabled else "✗"
             indicator = job.connector_params.get("indicator_code", "")
             filename = f"{job.export.filename}.{job.export.format}"
@@ -239,7 +235,7 @@ class PipelineApp(App):
         if not self._rows or cursor_row < 0 or cursor_row >= len(self._rows):
             return
 
-        manifest_path, job, default_format, _output_root_str = self._rows[cursor_row]
+        manifest_path, job, _ = self._rows[cursor_row]
 
         if event.button.id == "btn-toggle":
             job.enabled = not job.enabled
@@ -272,6 +268,6 @@ class PipelineApp(App):
                 self._refresh_table()
 
             self.push_screen(
-                EditJobScreen(manifest_path, job, default_format),
+                EditJobScreen(manifest_path, job),
                 on_edit_result,
             )
