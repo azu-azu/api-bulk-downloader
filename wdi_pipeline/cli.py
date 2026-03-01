@@ -325,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # 設定一覧表示
+    # list = report（確認用のスナップショット）
     elif args.command == "list":
         pipeline_dir_str = _require_pipeline_dir(args.pipeline_dir)
         if not pipeline_dir_str:
@@ -359,6 +360,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # TUI起動
+    # gui = control panel（運用・編集の操作盤）
     elif args.command == "gui":
         pipeline_dir_str = _require_pipeline_dir(args.pipeline_dir)
         if not pipeline_dir_str:
@@ -370,5 +372,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
 
+# sys.exit(0) → 成功
+# sys.exit(1) → 失敗
 if __name__ == "__main__":
     sys.exit(main())
